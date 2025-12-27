@@ -1,14 +1,20 @@
-import { NextRequest } from 'next/server';
-import { eq, and, desc, gte, sql } from 'drizzle-orm';
-import { db } from '@/db';
+import { NextRequest } from "next/server";
+import { eq, and, desc, gte, sql } from "drizzle-orm";
+import { db } from "@/db";
 import {
   invitationScanEvent,
   guestInvitation,
   guest,
   securityPersonnel,
-} from '@/db/schema';
-import { authenticateRequest } from '@/lib/auth';
-import { successResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
+} from "@/db/schema";
+import { authenticateRequest } from "@/lib/auth";
+import {
+  successResponse,
+  unauthorizedResponse,
+  serverErrorResponse,
+} from "@/lib/api-response";
+
+type Severity = "High" | "Medium" | "Low";
 
 // GET /api/alerts - Get all security alerts (failed scans) for the org admin
 export async function GET(req: NextRequest) {
@@ -17,27 +23,30 @@ export async function GET(req: NextRequest) {
     const authResult = await authenticateRequest(req);
 
     if (!authResult.success || !authResult.payload) {
-      return unauthorizedResponse('Unauthorized');
+      return unauthorizedResponse("Unauthorized");
     }
 
     const { organizationNodeId, role } = authResult.payload;
 
     // Only org admins can access this endpoint
-    if (role !== 'orgadmin') {
-      return unauthorizedResponse('Unauthorized');
+    if (role !== "orgadmin") {
+      return unauthorizedResponse("Unauthorized");
     }
 
     // Get query parameters
     const { searchParams } = new URL(req.url);
-    const timeFilter = searchParams.get('time') || 'all'; // all, today, week
-    const severityFilter = searchParams.get('severity') || 'all'; // all, high, medium
+    const timeFilter = searchParams.get("time") || "all"; // all, today, week
+    const severityFilter = searchParams.get("severity") || "all"; // all, High, Medium
 
     // Calculate date filter
     let dateCondition;
-    if (timeFilter === 'today') {
+    if (timeFilter === "today") {
       dateCondition = gte(invitationScanEvent.timestamp, sql`CURDATE()`);
-    } else if (timeFilter === 'week') {
-      dateCondition = gte(invitationScanEvent.timestamp, sql`DATE_SUB(NOW(), INTERVAL 7 DAY)`);
+    } else if (timeFilter === "week") {
+      dateCondition = gte(
+        invitationScanEvent.timestamp,
+        sql`DATE_SUB(NOW(), INTERVAL 7 DAY)`
+      );
     }
 
     // Build base conditions
@@ -66,32 +75,44 @@ export async function GET(req: NextRequest) {
         invitationStatus: guestInvitation.status,
       })
       .from(invitationScanEvent)
-      .innerJoin(guestInvitation, eq(invitationScanEvent.invitationId, guestInvitation.id))
+      .innerJoin(
+        guestInvitation,
+        eq(invitationScanEvent.invitationId, guestInvitation.id)
+      )
       .leftJoin(guest, eq(guestInvitation.guestId, guest.id))
-      .leftJoin(securityPersonnel, eq(invitationScanEvent.scannedBySecurityPersonnelId, securityPersonnel.id))
+      .leftJoin(
+        securityPersonnel,
+        eq(
+          invitationScanEvent.scannedBySecurityPersonnelId,
+          securityPersonnel.id
+        )
+      )
       .where(and(...conditions))
       .orderBy(desc(invitationScanEvent.timestamp));
 
     // Transform to alert format
-    const alerts = failedScans.map(scan => {
-      const failureReason = scan.failureReason || 'Scan verification failed';
+    const alerts = failedScans.map((scan) => {
+      const failureReason = scan.failureReason || "Scan verification failed";
 
       // Determine alert type and severity
-      let type = 'UNAUTHORIZED_ATTEMPT';
-      let severity: 'high' | 'medium' | 'low' = 'medium';
+      let type = "UNAUTHORIZED_ATTEMPT";
+      let severity: Severity = "Medium";
 
-      if (failureReason.toLowerCase().includes('otp')) {
-        type = 'OTP_FAILURE';
-        severity = 'high';
-      } else if (failureReason.toLowerCase().includes('expired')) {
-        type = 'EXPIRATION';
-        severity = 'medium';
-      } else if (failureReason.toLowerCase().includes('invalid') || failureReason.toLowerCase().includes('qr')) {
-        type = 'INVALID_QR';
-        severity = 'high';
-      } else if (failureReason.toLowerCase().includes('unauthorized')) {
-        type = 'UNAUTHORIZED_ATTEMPT';
-        severity = 'high';
+      if (failureReason.toLowerCase().includes("otp")) {
+        type = "OTP_FAILURE";
+        severity = "High";
+      } else if (failureReason.toLowerCase().includes("expired")) {
+        type = "EXPIRATION";
+        severity = "Medium";
+      } else if (
+        failureReason.toLowerCase().includes("invalid") ||
+        failureReason.toLowerCase().includes("qr")
+      ) {
+        type = "INVALID_QR";
+        severity = "High";
+      } else if (failureReason.toLowerCase().includes("unauthorized")) {
+        type = "UNAUTHORIZED_ATTEMPT";
+        severity = "High";
       }
 
       // Generate detailed message
@@ -110,9 +131,9 @@ export async function GET(req: NextRequest) {
         message,
         failureReason,
         timestamp: scan.timestamp,
-        guestName: scan.guestName || 'Unknown Guest',
-        guestPhone: scan.guestPhone || 'N/A',
-        guardUsername: scan.guardUsername || 'Unknown Guard',
+        guestName: scan.guestName || "Unknown Guest",
+        guestPhone: scan.guestPhone || "N/A",
+        guardUsername: scan.guardUsername || "Unknown Guard",
         securityLevel: scan.securityLevel,
         invitationId: scan.invitationId,
         invitationStatus: scan.invitationStatus,
@@ -120,31 +141,38 @@ export async function GET(req: NextRequest) {
     });
 
     // Filter by severity if specified
-    const filteredAlerts = severityFilter === 'all'
-      ? alerts
-      : alerts.filter(alert => alert.severity === severityFilter);
+    const filteredAlerts =
+      severityFilter === "all"
+        ? alerts
+        : alerts.filter((alert) => alert.severity === severityFilter);
 
     // Get summary stats
     const stats = {
       total: filteredAlerts.length,
-      high: filteredAlerts.filter(a => a.severity === 'high').length,
-      medium: filteredAlerts.filter(a => a.severity === 'medium').length,
-      low: filteredAlerts.filter(a => a.severity === 'low').length,
-      today: filteredAlerts.filter(a => {
+      High: filteredAlerts.filter((a) => a.severity === ("High" as Severity))
+        .length,
+      Medium: filteredAlerts.filter(
+        (a) => a.severity === ("Medium" as Severity)
+      ).length,
+      Low: filteredAlerts.filter((a) => a.severity === ("Low" as Severity))
+        .length,
+      today: filteredAlerts.filter((a) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         return new Date(a.timestamp) >= today;
       }).length,
     };
 
-    return successResponse({
-      alerts: filteredAlerts,
-      stats,
-    }, 'Alerts retrieved successfully');
-
+    return successResponse(
+      {
+        alerts: filteredAlerts,
+        stats,
+      },
+      "Alerts retrieved successfully"
+    );
   } catch (error) {
-    console.error('Alerts API Error:', error);
-    return serverErrorResponse('Failed to fetch alerts');
+    console.error("Alerts API Error:", error);
+    return serverErrorResponse("Failed to fetch alerts");
   }
 }
 

@@ -21,7 +21,9 @@ interface TierDistribution {
   value: number;
   count: number;
   color: string;
+  [key: string]: string | number;
 }
+
 
 interface Alert {
   id: string;
