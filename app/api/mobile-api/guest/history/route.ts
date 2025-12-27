@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, or } from 'drizzle-orm';
 import { db } from '@/db';
 import {
   guestInvitation,
@@ -70,12 +70,12 @@ export async function GET(req: NextRequest) {
       })
     );
 
-    // Categorize invitations
+    // Categorize invitations (database uses: 'active', 'pending', 'expired', 'revoked')
     const activeInvitations = invitationsWithHistory.filter(
       inv => inv.status === 'active'
     );
     const upcomingInvitations = invitationsWithHistory.filter(
-      inv => inv.status === 'upcoming'
+      inv => inv.status === 'pending' // 'pending' is the database status for upcoming
     );
     const pastInvitations = invitationsWithHistory.filter(
       inv => inv.status === 'expired' || inv.status === 'revoked'

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { orgAdmin } from '@/db/schema';
@@ -46,9 +46,7 @@ export async function POST(req: NextRequest) {
       token,
       user: {
         id: admin.id,
-        name: admin.name,
         email: admin.email,
-        phone: admin.phone,
         organizationNodeId: admin.organizationNodeId,
         createdAt: admin.createdAt,
       },

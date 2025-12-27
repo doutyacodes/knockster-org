@@ -59,9 +59,9 @@ export async function POST(req: NextRequest) {
 
     // Register/update device if provided
     if (deviceInfo) {
-      const { deviceId, deviceModel, osVersion } = deviceInfo;
+      const { deviceModel, osVersion } = deviceInfo;
 
-      // Check if device already exists
+      // Check if device already exists for this guest
       const existingDevice = await db
         .select()
         .from(guestDevice)
@@ -73,7 +73,6 @@ export async function POST(req: NextRequest) {
         await db
           .update(guestDevice)
           .set({
-            deviceId: deviceId || existingDevice[0].deviceId,
             deviceModel: deviceModel || existingDevice[0].deviceModel,
             osVersion: osVersion || existingDevice[0].osVersion,
             lastActive: new Date(),
@@ -83,7 +82,6 @@ export async function POST(req: NextRequest) {
         // Insert new device
         await db.insert(guestDevice).values({
           guestId: guestUser.id,
-          deviceId: deviceId || 'unknown',
           deviceModel: deviceModel || 'unknown',
           osVersion: osVersion || 'unknown',
           lastActive: new Date(),

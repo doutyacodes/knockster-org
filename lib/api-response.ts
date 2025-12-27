@@ -7,7 +7,7 @@ export interface ApiResponse<T = any> {
   message?: string;
 }
 
-export function successResponse<T>(data: T, message?: string) {
+export function successResponse<T>(data: T, message?: any) {
   return NextResponse.json({
     success: true,
     data,

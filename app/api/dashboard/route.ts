@@ -56,14 +56,14 @@ export async function GET(req: NextRequest) {
       );
     const activeInvitations = Number(activeInvitationsResult[0]?.count || 0);
 
-    // 2. Get Stats - Upcoming Visits Count
+    // 2. Get Stats - Upcoming Visits Count (pending invitations)
     const upcomingVisitsResult = await db
       .select({ count: sql<number>`count(*)` })
       .from(guestInvitation)
       .where(
         and(
           eq(guestInvitation.organizationNodeId, organizationNodeId!),
-          eq(guestInvitation.status, 'upcoming')
+          eq(guestInvitation.status, 'pending')
         )
       );
     const upcomingVisits = Number(upcomingVisitsResult[0]?.count || 0);

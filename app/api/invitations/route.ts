@@ -5,6 +5,33 @@ import { guestInvitation, guest, orgAdmin } from '@/db/schema';
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, errorResponse, unauthorizedResponse } from '@/lib/api-response';
 
+// Map database status to frontend status
+const mapStatusToFrontend = (dbStatus: string): string => {
+  const statusMap: Record<string, string> = {
+    'active': 'Active',
+    'pending': 'Upcoming',
+    'expired': 'Expired',
+    'revoked': 'Revoked'
+  };
+  return statusMap[dbStatus] || dbStatus;
+};
+
+// Map frontend status to database status
+const mapStatusToDatabase = (frontendStatus: string): 'active' | 'pending' | 'expired' | 'revoked' => {
+  const statusMap: Record<string, 'active' | 'pending' | 'expired' | 'revoked'> = {
+    'Active': 'active',
+    'Upcoming': 'pending',
+    'Expired': 'expired',
+    'Revoked': 'revoked'
+  };
+  return statusMap[frontendStatus] || 'pending';
+};
+
+// Map database security level to frontend format
+const mapSecurityLevelToFrontend = (level: number): string => {
+  return `L${level}`;
+};
+
 // GET /api/invitations - Get all invitations for the org admin
 export async function GET(req: NextRequest) {
   try {
@@ -30,8 +57,9 @@ export async function GET(req: NextRequest) {
     const conditions = [eq(guestInvitation.organizationNodeId, organizationNodeId!)];
 
     if (status && status !== 'all') {
-      // Cast status to the enum type using sql
-      conditions.push(sql`${guestInvitation.status} = ${status.toLowerCase()}`);
+      // Map frontend status to database status
+      const dbStatus = mapStatusToDatabase(status);
+      conditions.push(eq(guestInvitation.status, dbStatus));
     }
 
     // Fetch invitations with guest details
@@ -54,7 +82,21 @@ export async function GET(req: NextRequest) {
       .where(and(...conditions))
       .orderBy(desc(guestInvitation.createdAt));
 
-    return successResponse(invitations);
+    // Transform to frontend format
+    const transformedInvitations = invitations.map(inv => ({
+      id: inv.id,
+      employeeName: inv.employeeName,
+      employeePhone: inv.employeePhone,
+      guestName: inv.guestName || 'Unknown',
+      guestPhone: inv.guestPhone || 'N/A',
+      validFrom: inv.validFrom.toISOString(),
+      validTo: inv.validTo.toISOString(),
+      securityLevel: mapSecurityLevelToFrontend(inv.securityLevel!),
+      status: mapStatusToFrontend(inv.status),
+      createdAt: inv.createdAt.toISOString(),
+    }));
+
+    return successResponse(transformedInvitations);
   } catch (error) {
     console.error('Get invitations error:', error);
     return errorResponse('An error occurred while fetching invitations', 500);
@@ -94,8 +136,11 @@ export async function POST(req: NextRequest) {
       return errorResponse('All fields are required', 400);
     }
 
+    // Parse security level (convert L1, L2, L3, L4 to 1, 2, 3, 4)
+    const securityLevelNum = parseInt(securityLevel.replace('L', ''));
+    
     // Validate security level
-    if (![1, 2, 3, 4].includes(securityLevel)) {
+    if (![1, 2, 3, 4].includes(securityLevelNum)) {
       return errorResponse('Invalid security level', 400);
     }
 
@@ -140,10 +185,10 @@ export async function POST(req: NextRequest) {
 
     // Determine status based on dates
     const now = new Date();
-    let status: 'upcoming' | 'active' | 'expired' = 'pending';
+    let status: 'pending' | 'active' | 'expired' | 'revoked' = 'pending';
 
     if (validFromDate > now) {
-      status = 'upcoming';
+      status = 'pending'; // Upcoming
     } else if (validToDate < now) {
       status = 'expired';
     } else {
@@ -156,12 +201,12 @@ export async function POST(req: NextRequest) {
       .values({
         guestId,
         organizationNodeId: organizationNodeId!,
-        createdByOrgAdminId: adminId,
+        createdByOrgAdminId: adminId!,
         employeeName,
         employeePhone,
         validFrom: validFromDate,
         validTo: validToDate,
-        requestedSecurityLevel: securityLevel,
+        requestedSecurityLevel: securityLevelNum,
         status,
       })
       .$returningId();
@@ -186,9 +231,23 @@ export async function POST(req: NextRequest) {
       .where(eq(guestInvitation.id, newInvitation.id))
       .limit(1);
 
+    // Transform to frontend format
+    const transformedInvitation = {
+      id: invitation.id,
+      employeeName: invitation.employeeName,
+      employeePhone: invitation.employeePhone,
+      guestName: invitation.guestName || 'Unknown',
+      guestPhone: invitation.guestPhone || 'N/A',
+      validFrom: invitation.validFrom.toISOString(),
+      validTo: invitation.validTo.toISOString(),
+      securityLevel: mapSecurityLevelToFrontend(invitation.securityLevel!),
+      status: mapStatusToFrontend(invitation.status),
+      createdAt: invitation.createdAt.toISOString(),
+    };
+
     // TODO: Send invitation email/SMS to guest
 
-    return successResponse(invitation, 201);
+    return successResponse(transformedInvitation, 201);
   } catch (error) {
     console.error('Create invitation error:', error);
     return errorResponse('An error occurred while creating invitation', 500);
