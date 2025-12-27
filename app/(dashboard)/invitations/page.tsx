@@ -12,7 +12,7 @@ interface Invitation {
   employeePhone: string;
   validFrom: string;
   validTo: string;
-  securityLevel: number;
+  securityLevel: string; // Changed from number to string to match API response ("L1", "L2", etc.)
   status: InvitationStatus;
   createdAt: string;
 }
@@ -34,7 +34,7 @@ const Invitations: React.FC = () => {
     guestPhone: "",
     validFrom: "",
     validTo: "",
-    securityLevel: 1,
+    securityLevel: "L1", // Changed from 1 to "L1"
   });
 
   // Fetch invitations
@@ -119,7 +119,7 @@ const Invitations: React.FC = () => {
         guestPhone: "",
         validFrom: "",
         validTo: "",
-        securityLevel: 1,
+        securityLevel: "L1",
       });
       setShowModal(false);
 
@@ -301,12 +301,11 @@ const Invitations: React.FC = () => {
                       <td className="px-6 py-4 text-center">
                         <span
                           className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                            SECURITY_INFO[
-                              `L${invite.securityLevel}` as SecurityLevel
-                            ].color
+                            SECURITY_INFO[invite.securityLevel as SecurityLevel]
+                              ?.color || "bg-slate-100 text-slate-600"
                           }`}
                         >
-                          L{invite.securityLevel}
+                          {invite.securityLevel}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -509,13 +508,12 @@ const Invitations: React.FC = () => {
                         onClick={() =>
                           setFormData({
                             ...formData,
-                            securityLevel: parseInt(key.replace("L", "")),
+                            securityLevel: key as SecurityLevel,
                           })
                         }
                         className={`p-3 rounded-xl border transition-all text-center flex flex-col items-center gap-1.5
                         ${
-                          formData.securityLevel ===
-                          parseInt(key.replace("L", ""))
+                          formData.securityLevel === key
                             ? "border-blue-500 bg-blue-50 ring-2 ring-blue-500/20"
                             : "border-slate-200 bg-white hover:border-slate-300"
                         }`}
