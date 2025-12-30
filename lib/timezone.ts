@@ -110,8 +110,8 @@ export function convertDatesToIST<T extends Record<string, any>>(
   const converted = { ...obj };
 
   for (const field of dateFields) {
-    const value = converted[field];
-    if (value && typeof value === 'object' && value instanceof Date) {
+    const value: any = converted[field];
+    if (value instanceof Date) {
       converted[field] = toIST(value) as any;
     }
   }
