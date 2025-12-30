@@ -158,6 +158,7 @@ export async function GET(req: NextRequest) {
       Low: filteredAlerts.filter((a) => a.severity === ("Low" as Severity))
         .length,
       today: filteredAlerts.filter((a) => {
+        if (!a.timestamp) return false;
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         return new Date(a.timestamp) >= today;
