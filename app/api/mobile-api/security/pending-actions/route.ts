@@ -6,6 +6,7 @@ import {
   guestInvitation,
   guest,
   guestOtp,
+  securityPersonnel,
 } from '@/db/schema';
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
@@ -58,6 +59,18 @@ export async function GET(req: NextRequest) {
 
     // 2. Check for pending L4 OTPs (unverified and not expired)
     const now = new Date();
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
+    // Get guard's organization to find OTPs for invitations in their org
+    const guardData = await db
+      .select({
+        organizationNodeId: securityPersonnel.organizationNodeId,
+      })
+      .from(securityPersonnel)
+      .where(eq(securityPersonnel.id, guardId!))
+      .limit(1);
+
+    const guardOrgId = guardData[0]?.organizationNodeId;
 
     const pendingL4Otps = await db
       .select({
@@ -75,18 +88,13 @@ export async function GET(req: NextRequest) {
       .from(guestOtp)
       .innerJoin(guestInvitation, eq(guestOtp.invitationId, guestInvitation.id))
       .leftJoin(guest, eq(guestInvitation.guestId, guest.id))
-      .innerJoin(
-        invitationScanEvent,
-        and(
-          eq(invitationScanEvent.invitationId, guestOtp.invitationId),
-          eq(invitationScanEvent.scannedBySecurityPersonnelId, guardId!)
-        )
-      )
       .where(
         and(
           eq(guestOtp.verified, false),
           gte(guestOtp.expiresAt, now),
-          eq(guestInvitation.requestedSecurityLevel, 4)
+          gte(guestOtp.createdAt, fiveMinutesAgo),
+          eq(guestInvitation.requestedSecurityLevel, 4),
+          guardOrgId ? eq(guestInvitation.organizationNodeId, guardOrgId) : sql`1=1`
         )
       )
       .orderBy(desc(guestOtp.createdAt))
