@@ -10,6 +10,7 @@ import {
 } from '@/db/schema';
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
+import { toIST } from '@/lib/timezone';
 
 // GET /api/dashboard - Get dashboard statistics and data
 export async function GET(req: NextRequest) {

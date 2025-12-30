@@ -9,6 +9,7 @@ import {
 } from '@/db/schema';
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
+import { toIST } from '@/lib/timezone';
 
 // GET /api/mobile-api/security/dashboard - Get security guard's dashboard stats
 export async function GET(req: NextRequest) {
@@ -125,7 +126,7 @@ export async function GET(req: NextRequest) {
       },
       recentActivity: recentScans.map(scan => ({
         id: scan.id,
-        timestamp: scan.timestamp,
+        timestamp: toIST(scan.timestamp),
         success: scan.success,
         failureReason: scan.failureReason,
         securityLevel: scan.securityLevel,

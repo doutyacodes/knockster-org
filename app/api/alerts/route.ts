@@ -13,6 +13,7 @@ import {
   unauthorizedResponse,
   serverErrorResponse,
 } from "@/lib/api-response";
+import { toIST } from "@/lib/timezone";
 
 type Severity = "High" | "Medium" | "Low";
 
@@ -130,7 +131,7 @@ export async function GET(req: NextRequest) {
         severity,
         message,
         failureReason,
-        timestamp: scan.timestamp,
+        timestamp: toIST(scan.timestamp),
         guestName: scan.guestName || "Unknown Guest",
         guestPhone: scan.guestPhone || "N/A",
         guardUsername: scan.guardUsername || "Unknown Guard",

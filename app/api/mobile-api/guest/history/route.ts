@@ -8,6 +8,7 @@ import {
 } from '@/db/schema';
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
+import { toIST } from '@/lib/timezone';
 
 // GET /api/mobile-api/guest/history - Get guest's invitation history
 export async function GET(req: NextRequest) {
@@ -63,9 +64,15 @@ export async function GET(req: NextRequest) {
 
         return {
           ...invitation,
-          scanHistory: scans,
+          validFrom: toIST(invitation.validFrom),
+          validTo: toIST(invitation.validTo),
+          createdAt: toIST(invitation.createdAt),
+          scanHistory: scans.map(scan => ({
+            ...scan,
+            timestamp: toIST(scan.timestamp),
+          })),
           totalScans: scans.length,
-          lastScan: scans.length > 0 ? scans[0].timestamp : null,
+          lastScan: scans.length > 0 ? toIST(scans[0].timestamp) : null,
         };
       })
     );

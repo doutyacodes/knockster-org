@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { orgAdmin } from '@/db/schema';
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, unauthorizedResponse, errorResponse } from '@/lib/api-response';
+import { toIST } from '@/lib/timezone';
 
 export async function GET(req: NextRequest) {
   try {
@@ -37,7 +38,10 @@ export async function GET(req: NextRequest) {
       return unauthorizedResponse('Admin not found');
     }
 
-    return successResponse(admin);
+    return successResponse({
+      ...admin,
+      createdAt: toIST(admin.createdAt),
+    });
   } catch (error) {
     console.error('Get profile error:', error);
     return errorResponse('An error occurred', 500);

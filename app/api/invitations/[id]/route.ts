@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { guestInvitation, guest, invitationScanEvent, guestQrSession, guestOtp } from '@/db/schema';
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, errorResponse, unauthorizedResponse, notFoundResponse } from '@/lib/api-response';
+import { toIST, fromIST } from '@/lib/timezone';
 
 // GET /api/invitations/[id] - Get a specific invitation with details
 export async function GET(
@@ -77,10 +78,10 @@ export async function GET(
       .orderBy(desc(invitationScanEvent.timestamp))
       .limit(10);
 
-    // Transform scan events for frontend
+    // Transform scan events for frontend with IST timezone
     const scanEvents = scanEventsData.map(scan => ({
       id: scan.id,
-      scannedAt: scan.scannedAt,
+      scannedAt: toIST(scan.scannedAt),
       scanResult: scan.success ? 'SUCCESS' : 'FAILED',
       failureReason: scan.failureReason,
       securityLevel: scan.securityLevel,
@@ -100,8 +101,14 @@ export async function GET(
 
     return successResponse({
       ...invitationData,
+      validFrom: toIST(invitationData.validFrom),
+      validTo: toIST(invitationData.validTo),
+      createdAt: toIST(invitationData.createdAt),
       scanEvents,
-      qrSession: qrSession || null,
+      qrSession: qrSession ? {
+        ...qrSession,
+        expiresAt: toIST(qrSession.expiresAt),
+      } : null,
     });
   } catch (error) {
     console.error('Get invitation error:', error);
@@ -162,11 +169,11 @@ export async function PATCH(
     }
 
     if (validFrom) {
-      updateData.validFrom = new Date(validFrom);
+      updateData.validFrom = fromIST(validFrom);
     }
 
     if (validTo) {
-      updateData.validTo = new Date(validTo);
+      updateData.validTo = fromIST(validTo);
     }
 
     if (securityLevel) {
@@ -206,11 +213,14 @@ export async function PATCH(
       return notFoundResponse('Invitation not found after update');
     }
 
-    // Ensure guest data has fallbacks
+    // Ensure guest data has fallbacks and convert dates to IST
     const responseData = {
       ...updatedInvitation,
       guestName: updatedInvitation.guestName || 'Unknown',
       guestPhone: updatedInvitation.guestPhone || 'N/A',
+      validFrom: toIST(updatedInvitation.validFrom),
+      validTo: toIST(updatedInvitation.validTo),
+      createdAt: toIST(updatedInvitation.createdAt),
     };
 
     return successResponse(responseData);

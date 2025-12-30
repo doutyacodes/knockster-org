@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { orgAdmin } from '@/db/schema';
 import { verifyPassword, generateToken } from '@/lib/auth';
 import { successResponse, errorResponse, unauthorizedResponse } from '@/lib/api-response';
+import { toIST } from '@/lib/timezone';
 
 export async function POST(req: NextRequest) {
   try {
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
         id: admin.id,
         email: admin.email,
         organizationNodeId: admin.organizationNodeId,
-        createdAt: admin.createdAt,
+        createdAt: toIST(admin.createdAt),
       },
     });
   } catch (error) {

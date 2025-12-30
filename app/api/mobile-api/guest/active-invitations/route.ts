@@ -9,6 +9,7 @@ import {
 } from '@/db/schema';
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
+import { toIST } from '@/lib/timezone';
 import crypto from 'crypto';
 
 // GET /api/mobile-api/guest/active-invitations - Get active invitations with QR codes
@@ -135,8 +136,8 @@ export async function GET(req: NextRequest) {
           id: invitation.id,
           employeeName: invitation.employeeName,
           employeePhone: invitation.employeePhone,
-          validFrom: invitation.validFrom,
-          validTo: invitation.validTo,
+          validFrom: toIST(invitation.validFrom),
+          validTo: toIST(invitation.validTo),
           securityLevel: invitation.securityLevel,
           status: invitation.status,
           organization: {
@@ -146,7 +147,7 @@ export async function GET(req: NextRequest) {
           },
           qrSession: qrSession ? {
             qrCode: qrSession.rotatingKey,
-            expiresAt: qrSession.expiresAt,
+            expiresAt: toIST(qrSession.expiresAt),
             qrData: JSON.stringify({
               invitationId: invitation.id,
               qrCode: qrSession.rotatingKey,
@@ -154,7 +155,7 @@ export async function GET(req: NextRequest) {
           } : null,
           otp: otp ? {
             otpCode: otp.otpCode,
-            expiresAt: otp.expiresAt,
+            expiresAt: toIST(otp.expiresAt),
           } : null,
         };
       })

@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { securityPersonnel, guardDevice } from '@/db/schema';
 import { authenticateRequest, hashPassword } from '@/lib/auth';
 import { successResponse, errorResponse, unauthorizedResponse } from '@/lib/api-response';
+import { toIST, formatTimeIST, parseTimeToUTC } from '@/lib/timezone';
 
 // GET /api/personnel - Get all security personnel for the org
 export async function GET(req: NextRequest) {
@@ -41,10 +42,14 @@ export async function GET(req: NextRequest) {
       .where(eq(securityPersonnel.organizationNodeId, organizationNodeId!))
       .orderBy(desc(securityPersonnel.createdAt));
 
-    // Transform status enum to boolean for frontend
+    // Transform status enum to boolean and convert dates to IST
     const transformedPersonnel = personnel.map(p => ({
       ...p,
       isActive: p.isActive === 'active',
+      shiftStart: formatTimeIST(p.shiftStart),
+      shiftEnd: formatTimeIST(p.shiftEnd),
+      createdAt: toIST(p.createdAt),
+      lastSeenAt: toIST(p.lastSeenAt),
     }));
 
     return successResponse(transformedPersonnel);
@@ -93,6 +98,10 @@ export async function POST(req: NextRequest) {
     // Hash password
     const passwordHash = await hashPassword(password);
 
+    // Convert shift times from IST to UTC if provided
+    const shiftStartUTC = shiftStart ? parseTimeToUTC(shiftStart) : null;
+    const shiftEndUTC = shiftEnd ? parseTimeToUTC(shiftEnd) : null;
+
     // Create personnel
     const [newPersonnel] = await db
       .insert(securityPersonnel)
@@ -100,8 +109,8 @@ export async function POST(req: NextRequest) {
         organizationNodeId: organizationNodeId!,
         username,
         passwordHash,
-        shiftStartTime: shiftStart || null,
-        shiftEndTime: shiftEnd || null,
+        shiftStartTime: shiftStartUTC,
+        shiftEndTime: shiftEndUTC,
         status: 'active',
       })
       .$returningId();
@@ -120,10 +129,13 @@ export async function POST(req: NextRequest) {
       .where(eq(securityPersonnel.id, newPersonnel.id))
       .limit(1);
 
-    // Transform status to boolean
+    // Transform status to boolean and convert dates to IST
     const transformed = {
       ...personnel,
       isActive: personnel.isActive === 'active',
+      shiftStart: formatTimeIST(personnel.shiftStart),
+      shiftEnd: formatTimeIST(personnel.shiftEnd),
+      createdAt: toIST(personnel.createdAt),
     };
 
     return successResponse(transformed, 201);

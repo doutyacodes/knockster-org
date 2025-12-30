@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { securityPersonnel, organizationNode } from '@/db/schema';
 import { authenticateRequest, hashPassword } from '@/lib/auth';
 import { successResponse, errorResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
+import { toIST, formatTimeIST } from '@/lib/timezone';
 
 // GET /api/mobile-api/security/profile - Get security guard's profile
 export async function GET(req: NextRequest) {
@@ -50,9 +51,9 @@ export async function GET(req: NextRequest) {
       id: guard.id,
       username: guard.username,
       status: guard.status,
-      shiftStartTime: guard.shiftStartTime,
-      shiftEndTime: guard.shiftEndTime,
-      createdAt: guard.createdAt,
+      shiftStartTime: formatTimeIST(guard.shiftStartTime),
+      shiftEndTime: formatTimeIST(guard.shiftEndTime),
+      createdAt: toIST(guard.createdAt),
       organization: {
         id: guard.organizationNodeId,
         name: guard.orgName || 'Unknown Organization',

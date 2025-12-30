@@ -7,6 +7,7 @@ import {
 } from '@/db/schema';
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, unauthorizedResponse, serverErrorResponse, notFoundResponse } from '@/lib/api-response';
+import { toIST } from '@/lib/timezone';
 
 // GET /api/mobile-api/guest/scan-status/[invitationId] - Get latest scan status for invitation
 export async function GET(
@@ -58,7 +59,7 @@ export async function GET(
     return successResponse({
       scanEvent: {
         id: scan.id,
-        timestamp: scan.timestamp,
+        timestamp: toIST(scan.timestamp),
         success: scan.success,
         failureReason: scan.failureReason,
         securityLevel: scan.securityLevel,

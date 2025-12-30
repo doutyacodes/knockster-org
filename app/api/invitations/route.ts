@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { guestInvitation, guest, orgAdmin } from '@/db/schema';
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, errorResponse, unauthorizedResponse } from '@/lib/api-response';
+import { toIST, fromIST } from '@/lib/timezone';
 
 // Map database status to frontend status
 const mapStatusToFrontend = (dbStatus: string): string => {
@@ -82,18 +83,18 @@ export async function GET(req: NextRequest) {
       .where(and(...conditions))
       .orderBy(desc(guestInvitation.createdAt));
 
-    // Transform to frontend format
+    // Transform to frontend format with IST timezone
     const transformedInvitations = invitations.map(inv => ({
       id: inv.id,
       employeeName: inv.employeeName,
       employeePhone: inv.employeePhone,
       guestName: inv.guestName || 'Unknown',
       guestPhone: inv.guestPhone || 'N/A',
-      validFrom: inv.validFrom.toISOString(),
-      validTo: inv.validTo.toISOString(),
+      validFrom: toIST(inv.validFrom),
+      validTo: toIST(inv.validTo),
       securityLevel: mapSecurityLevelToFrontend(inv.securityLevel!),
       status: mapStatusToFrontend(inv.status),
-      createdAt: inv.createdAt.toISOString(),
+      createdAt: toIST(inv.createdAt),
     }));
 
     return successResponse(transformedInvitations);
@@ -144,9 +145,9 @@ export async function POST(req: NextRequest) {
       return errorResponse('Invalid security level', 400);
     }
 
-    // Validate date range
-    const validFromDate = new Date(validFrom);
-    const validToDate = new Date(validTo);
+    // Convert IST dates from frontend to UTC for database
+    const validFromDate = fromIST(validFrom);
+    const validToDate = fromIST(validTo);
 
     if (validFromDate >= validToDate) {
       return errorResponse('validTo must be after validFrom', 400);
@@ -231,18 +232,18 @@ export async function POST(req: NextRequest) {
       .where(eq(guestInvitation.id, newInvitation.id))
       .limit(1);
 
-    // Transform to frontend format
+    // Transform to frontend format with IST timezone
     const transformedInvitation = {
       id: invitation.id,
       employeeName: invitation.employeeName,
       employeePhone: invitation.employeePhone,
       guestName: invitation.guestName || 'Unknown',
       guestPhone: invitation.guestPhone || 'N/A',
-      validFrom: invitation.validFrom.toISOString(),
-      validTo: invitation.validTo.toISOString(),
+      validFrom: toIST(invitation.validFrom),
+      validTo: toIST(invitation.validTo),
       securityLevel: mapSecurityLevelToFrontend(invitation.securityLevel!),
       status: mapStatusToFrontend(invitation.status),
-      createdAt: invitation.createdAt.toISOString(),
+      createdAt: toIST(invitation.createdAt),
     };
 
     // TODO: Send invitation email/SMS to guest
