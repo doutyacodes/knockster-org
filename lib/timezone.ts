@@ -152,13 +152,16 @@ export function parseTimeToUTC(timeString: string): Date {
 
 /**
  * Format a Date object to time string (HH:mm:ss)
- * @param date - Date object
+ * @param date - Date object or string
  * @returns Time string in IST (HH:mm:ss)
  */
-export function formatTimeIST(date: Date | null | undefined): string | null {
+export function formatTimeIST(date: Date | string | null | undefined): string | null {
   if (!date) return null;
 
-  return DateTime.fromJSDate(date)
+  // Handle both Date objects and string inputs
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+
+  return DateTime.fromJSDate(dateObj)
     .setZone(IST_ZONE)
     .toFormat('HH:mm:ss');
 }

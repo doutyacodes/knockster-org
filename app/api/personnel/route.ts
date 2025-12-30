@@ -4,7 +4,7 @@ import { db } from '@/db';
 import { securityPersonnel, guardDevice } from '@/db/schema';
 import { authenticateRequest, hashPassword } from '@/lib/auth';
 import { successResponse, errorResponse, unauthorizedResponse } from '@/lib/api-response';
-import { toIST, formatTimeIST, parseTimeToUTC } from '@/lib/timezone';
+import { toIST } from '@/lib/timezone';
 
 // GET /api/personnel - Get all security personnel for the org
 export async function GET(req: NextRequest) {
@@ -46,8 +46,8 @@ export async function GET(req: NextRequest) {
     const transformedPersonnel = personnel.map(p => ({
       ...p,
       isActive: p.isActive === 'active',
-      shiftStart: formatTimeIST(p.shiftStart),
-      shiftEnd: formatTimeIST(p.shiftEnd),
+      shiftStart: p.shiftStart, // Already stored as HH:MM string
+      shiftEnd: p.shiftEnd, // Already stored as HH:MM string
       createdAt: toIST(p.createdAt),
       lastSeenAt: toIST(p.lastSeenAt),
     }));
@@ -98,9 +98,10 @@ export async function POST(req: NextRequest) {
     // Hash password
     const passwordHash = await hashPassword(password);
 
-    // Convert shift times from IST to UTC if provided
-    const shiftStartUTC = shiftStart ? parseTimeToUTC(shiftStart) : null;
-    const shiftEndUTC = shiftEnd ? parseTimeToUTC(shiftEnd) : null;
+    // Shift times are stored as HH:MM strings (not full dates)
+    // Just use the time string directly
+    const shiftStartFormatted = shiftStart || null;
+    const shiftEndFormatted = shiftEnd || null;
 
     // Create personnel
     const [newPersonnel] = await db
@@ -109,8 +110,8 @@ export async function POST(req: NextRequest) {
         organizationNodeId: organizationNodeId!,
         username,
         passwordHash,
-        shiftStartTime: shiftStartUTC,
-        shiftEndTime: shiftEndUTC,
+        shiftStartTime: shiftStartFormatted,
+        shiftEndTime: shiftEndFormatted,
         status: 'active',
       })
       .$returningId();
@@ -133,8 +134,8 @@ export async function POST(req: NextRequest) {
     const transformed = {
       ...personnel,
       isActive: personnel.isActive === 'active',
-      shiftStart: formatTimeIST(personnel.shiftStart),
-      shiftEnd: formatTimeIST(personnel.shiftEnd),
+      shiftStart: personnel.shiftStart, // Already stored as HH:MM string
+      shiftEnd: personnel.shiftEnd, // Already stored as HH:MM string
       createdAt: toIST(personnel.createdAt),
     };
 
