@@ -3,7 +3,10 @@
     "allow": [
       "Bash(cat:*)",
       "Bash(npm run build:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(dir /s /b \"E:\\\\Shabeer\\\\Work\\\\nextjs\\\\knockster-org\")",
+      "Bash(findstr:*)",
+      "Bash(tree:*)"
     ]
   }
 }
