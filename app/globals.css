@@ -19,6 +19,12 @@
   }
 }
 
+@layer base {
+  input, textarea, select {
+    @apply text-gray-800 placeholder-gray-400;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
