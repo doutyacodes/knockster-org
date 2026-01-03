@@ -6,6 +6,7 @@ import {
   guestInvitation,
   guest,
   securityPersonnel,
+  organizationNode,
 } from '@/db/schema';
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
@@ -68,10 +69,15 @@ export async function GET(req: NextRequest) {
         guestName: guest.name,
         guestPhone: guest.phone,
         invitationStatus: guestInvitation.status,
+        employeeName: guestInvitation.employeeName,
+        employeePhone: guestInvitation.employeePhone,
+        organizationName: organizationNode.name,
+        organizationType: organizationNode.type,
       })
       .from(invitationScanEvent)
       .innerJoin(guestInvitation, eq(invitationScanEvent.invitationId, guestInvitation.id))
       .leftJoin(guest, eq(guestInvitation.guestId, guest.id))
+      .leftJoin(organizationNode, eq(guestInvitation.organizationNodeId, organizationNode.id))
       .where(eq(invitationScanEvent.scannedBySecurityPersonnelId, guardId!))
       .orderBy(desc(invitationScanEvent.timestamp))
       .limit(10);
@@ -132,6 +138,10 @@ export async function GET(req: NextRequest) {
         securityLevel: scan.securityLevel,
         guestName: scan.guestName || 'Unknown Guest',
         guestPhone: scan.guestPhone || 'N/A',
+        employeeName: scan.employeeName,
+        employeePhone: scan.employeePhone,
+        organizationName: scan.organizationName || 'Unknown Organization',
+        organizationType: scan.organizationType,
         invitationStatus: scan.invitationStatus,
       })),
     }, 'Dashboard data retrieved successfully');

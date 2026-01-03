@@ -7,7 +7,8 @@
       "Bash(dir /s /b \"E:\\\\Shabeer\\\\Work\\\\nextjs\\\\knockster-org\")",
       "Bash(findstr:*)",
       "Bash(tree:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(mkdir:*)"
     ]
   }
 }
