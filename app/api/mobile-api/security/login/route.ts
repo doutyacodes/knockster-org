@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { db } from '@/db';
-import { securityPersonnel, guardDevice, organizationNode } from '@/db/schema';
+import { securityPersonnel, guardDevice, organizationNode, notificationTokens } from '@/db/schema';
 import { verifyPassword, generateToken } from '@/lib/auth';
 import { successResponse, errorResponse } from '@/lib/api-response';
 
@@ -9,7 +9,7 @@ import { successResponse, errorResponse } from '@/lib/api-response';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { username, password, deviceInfo } = body;
+    const { username, password, deviceInfo, deviceToken, platform } = body;
 
     if (!username || !password) {
       return errorResponse('Username and password are required', 400);
@@ -77,6 +77,47 @@ export async function POST(req: NextRequest) {
       .update(securityPersonnel)
       .set({ lastActive: new Date() })
       .where(eq(securityPersonnel.id, guard.id));
+
+    // Store device notification token if provided
+    if (deviceToken && platform) {
+      // Check if token already exists for this security personnel
+      const existingToken = await db
+        .select()
+        .from(notificationTokens)
+        .where(
+          and(
+            eq(notificationTokens.securityPersonnelId, guard.id),
+            eq(notificationTokens.deviceToken, deviceToken)
+          )
+        )
+        .limit(1);
+
+      if (existingToken.length > 0) {
+        // Update existing token (mark as active and update timestamp)
+        await db
+          .update(notificationTokens)
+          .set({
+            isActive: true,
+            platform: platform,
+            updatedAt: new Date(),
+          })
+          .where(eq(notificationTokens.id, existingToken[0].id));
+      } else {
+        // Deactivate old tokens for this security personnel
+        await db
+          .update(notificationTokens)
+          .set({ isActive: false })
+          .where(eq(notificationTokens.securityPersonnelId, guard.id));
+
+        // Insert new token
+        await db.insert(notificationTokens).values({
+          securityPersonnelId: guard.id,
+          deviceToken: deviceToken,
+          platform: platform,
+          isActive: true,
+        });
+      }
+    }
 
     // Get organization info
     const orgInfo = await db

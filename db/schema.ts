@@ -155,16 +155,53 @@ export const invitationScanEvent = mysqlTable('invitation_scan_event', {
   failureReason: text('failure_reason'),
 });
 
-// 14. Notification Tokens
+// 14. App Config (Maintenance & Force Update)
+export const appConfig = mysqlTable('app_config', {
+  id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  guestAppMaintenance: boolean('guest_app_maintenance').default(false).notNull(),
+  guestAppMaintenanceMessage: text('guest_app_maintenance_message'),
+  securityAppMaintenance: boolean('security_app_maintenance').default(false).notNull(),
+  securityAppMaintenanceMessage: text('security_app_maintenance_message'),
+  guestAppForceUpdate: boolean('guest_app_force_update').default(false).notNull(),
+  guestAppMinVersion: varchar('guest_app_min_version', { length: 20 }),
+  securityAppForceUpdate: boolean('security_app_force_update').default(false).notNull(),
+  securityAppMinVersion: varchar('security_app_min_version', { length: 20 }),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// 15. Notification Tokens
 export const notificationTokens = mysqlTable('notification_tokens', {
   id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   guestId: varchar('guest_id', { length: 36 }),
   securityPersonnelId: varchar('security_personnel_id', { length: 36 }),
   deviceToken: text('device_token').notNull(),
+  platform: mysqlEnum('platform', ['ios', 'android']).notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-// 15. Audit Log
+// 16. Notifications (Broadcast to all guests or all security)
+export const notifications = mysqlTable('notifications', {
+  id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  title: varchar('title', { length: 255 }).notNull(),
+  body: text('body').notNull(),
+  recipientType: mysqlEnum('recipient_type', ['guest', 'security']).notNull(),
+  notificationType: mysqlEnum('notification_type', ['invitation', 'scan', 'alert', 'system', 'general']).notNull(),
+  relatedEntityId: varchar('related_entity_id', { length: 36 }),
+  sentAt: timestamp('sent_at').defaultNow().notNull(),
+});
+
+// 17. Notification Reads (Track which user read which notification)
+export const notificationReads = mysqlTable('notification_reads', {
+  id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  notificationId: varchar('notification_id', { length: 36 }).notNull(),
+  guestId: varchar('guest_id', { length: 36 }),
+  securityPersonnelId: varchar('security_personnel_id', { length: 36 }),
+  readAt: timestamp('read_at').defaultNow().notNull(),
+});
+
+// 18. Audit Log
 export const auditLog = mysqlTable('audit_log', {
   id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   actorType: mysqlEnum('actor_type', ['SuperAdmin', 'OrgAdmin', 'Guard', 'System']).notNull(),
@@ -174,7 +211,7 @@ export const auditLog = mysqlTable('audit_log', {
   timestamp: timestamp('timestamp').defaultNow().notNull(),
 });
 
-// 16. Billing Record
+// 19. Billing Record
 export const billingRecord = mysqlTable('billing_record', {
   id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   organizationNodeId: varchar('organization_node_id', { length: 36 }).notNull(),
@@ -185,7 +222,7 @@ export const billingRecord = mysqlTable('billing_record', {
   status: mysqlEnum('status', ['pending', 'paid', 'failed', 'refunded']).default('pending').notNull(),
 });
 
-// 17. Geo Gate Location (Optional)
+// 20. Geo Gate Location (Optional)
 export const geoGateLocation = mysqlTable('geo_gate_location', {
   id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   organizationNodeId: varchar('organization_node_id', { length: 36 }).notNull(),
@@ -245,6 +282,7 @@ export const securityPersonnelRelations = relations(securityPersonnel, ({ one, m
   guardDevices: many(guardDevice),
   scanEvents: many(invitationScanEvent),
   notificationTokens: many(notificationTokens),
+  notificationReads: many(notificationReads),
 }));
 
 export const guardDeviceRelations = relations(guardDevice, ({ one }) => ({
@@ -258,6 +296,7 @@ export const guestRelations = relations(guest, ({ many }) => ({
   invitations: many(guestInvitation),
   devices: many(guestDevice),
   notificationTokens: many(notificationTokens),
+  notificationReads: many(notificationReads),
 }));
 
 export const guestDeviceRelations = relations(guestDevice, ({ one }) => ({
@@ -317,6 +356,25 @@ export const notificationTokensRelations = relations(notificationTokens, ({ one 
   }),
   securityPersonnel: one(securityPersonnel, {
     fields: [notificationTokens.securityPersonnelId],
+    references: [securityPersonnel.id],
+  }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ many }) => ({
+  reads: many(notificationReads),
+}));
+
+export const notificationReadsRelations = relations(notificationReads, ({ one }) => ({
+  notification: one(notifications, {
+    fields: [notificationReads.notificationId],
+    references: [notifications.id],
+  }),
+  guest: one(guest, {
+    fields: [notificationReads.guestId],
+    references: [guest.id],
+  }),
+  securityPersonnel: one(securityPersonnel, {
+    fields: [notificationReads.securityPersonnelId],
     references: [securityPersonnel.id],
   }),
 }));

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { db } from '@/db';
-import { guest, guestDevice } from '@/db/schema';
+import { guest, guestDevice, notificationTokens } from '@/db/schema';
 import { generateToken } from '@/lib/auth';
 import { successResponse, errorResponse } from '@/lib/api-response';
 import crypto from 'crypto';
@@ -10,7 +10,7 @@ import crypto from 'crypto';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { phone, name, deviceInfo } = body;
+    const { phone, name, deviceInfo, deviceToken, platform } = body;
 
     if (!phone) {
       return errorResponse('Phone number is required', 400);
@@ -85,6 +85,47 @@ export async function POST(req: NextRequest) {
           deviceModel: deviceModel || 'unknown',
           osVersion: osVersion || 'unknown',
           lastActive: new Date(),
+        });
+      }
+    }
+
+    // Store device notification token if provided
+    if (deviceToken && platform) {
+      // Check if token already exists for this guest
+      const existingToken = await db
+        .select()
+        .from(notificationTokens)
+        .where(
+          and(
+            eq(notificationTokens.guestId, guestUser.id),
+            eq(notificationTokens.deviceToken, deviceToken)
+          )
+        )
+        .limit(1);
+
+      if (existingToken.length > 0) {
+        // Update existing token (mark as active and update timestamp)
+        await db
+          .update(notificationTokens)
+          .set({
+            isActive: true,
+            platform: platform,
+            updatedAt: new Date(),
+          })
+          .where(eq(notificationTokens.id, existingToken[0].id));
+      } else {
+        // Deactivate old tokens for this guest
+        await db
+          .update(notificationTokens)
+          .set({ isActive: false })
+          .where(eq(notificationTokens.guestId, guestUser.id));
+
+        // Insert new token
+        await db.insert(notificationTokens).values({
+          guestId: guestUser.id,
+          deviceToken: deviceToken,
+          platform: platform,
+          isActive: true,
         });
       }
     }
