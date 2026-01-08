@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Authenticate the request
@@ -25,7 +25,7 @@ export async function POST(
     }
 
     const securityPersonnelId = authResult.userId;
-    const notificationId = params.id;
+    const { id: notificationId } = await params;
 
     // Check if notification exists and is for security personnel
     const notification = await db
