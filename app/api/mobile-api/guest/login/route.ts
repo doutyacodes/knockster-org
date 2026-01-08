@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
       } else {
         // Insert new device
         await db.insert(guestDevice).values({
+          id: crypto.randomUUID(),
           guestId: guestUser.id,
           deviceModel: deviceModel || 'unknown',
           osVersion: osVersion || 'unknown',
@@ -110,7 +111,6 @@ export async function POST(req: NextRequest) {
           .set({
             isActive: true,
             platform: platform,
-            updatedAt: new Date(),
           })
           .where(eq(notificationTokens.id, existingToken[0].id));
       } else {
@@ -122,6 +122,7 @@ export async function POST(req: NextRequest) {
 
         // Insert new token
         await db.insert(notificationTokens).values({
+          id: crypto.randomUUID(),
           guestId: guestUser.id,
           deviceToken: deviceToken,
           platform: platform,

@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { securityPersonnel, guardDevice, organizationNode, notificationTokens } from '@/db/schema';
 import { verifyPassword, generateToken } from '@/lib/auth';
 import { successResponse, errorResponse } from '@/lib/api-response';
+import crypto from 'crypto';
 
 // POST /api/mobile-api/security/login - Security personnel login
 export async function POST(req: NextRequest) {
@@ -64,6 +65,7 @@ export async function POST(req: NextRequest) {
 
       // Insert new device
       await db.insert(guardDevice).values({
+        id: crypto.randomUUID(),
         securityPersonnelId: guard.id,
         deviceModel: deviceModel || 'unknown',
         osVersion: osVersion || 'unknown',
@@ -99,7 +101,6 @@ export async function POST(req: NextRequest) {
           .set({
             isActive: true,
             platform: platform,
-            updatedAt: new Date(),
           })
           .where(eq(notificationTokens.id, existingToken[0].id));
       } else {
@@ -111,6 +112,7 @@ export async function POST(req: NextRequest) {
 
         // Insert new token
         await db.insert(notificationTokens).values({
+          id: crypto.randomUUID(),
           securityPersonnelId: guard.id,
           deviceToken: deviceToken,
           platform: platform,
