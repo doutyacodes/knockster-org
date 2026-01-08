@@ -20,11 +20,15 @@ export async function POST(
   try {
     // Authenticate the request
     const authResult = await authenticateRequest(request);
-    if (!authResult.authenticated || authResult.role !== 'guest') {
+    if (!authResult.success || !authResult.payload) {
       return unauthorizedResponse('Authentication required');
     }
 
-    const guestId = authResult.userId;
+    if (authResult.payload.role !== 'guest') {
+      return unauthorizedResponse('Authentication required');
+    }
+
+    const guestId = authResult.payload.id;
     const { id: notificationId } = await params;
 
     // Check if notification exists and is for guests

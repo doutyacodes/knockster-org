@@ -16,11 +16,15 @@ export async function GET(request: NextRequest) {
   try {
     // Authenticate the request
     const authResult = await authenticateRequest(request);
-    if (!authResult.authenticated || authResult.role !== 'guest') {
+    if (!authResult.success || !authResult.payload) {
       return unauthorizedResponse('Authentication required');
     }
 
-    const guestId = authResult.userId;
+    if (authResult.payload.role !== 'guest') {
+      return unauthorizedResponse('Authentication required');
+    }
+
+    const guestId = authResult.payload.id;
 
     // Get all notifications for guests
     const allNotifications = await db
