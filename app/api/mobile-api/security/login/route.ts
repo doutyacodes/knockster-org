@@ -87,6 +87,7 @@ export async function POST(req: NextRequest) {
         const existingToken = await db
           .select({
             id: notificationTokens.id,
+            isActive: notificationTokens.isActive,
           })
           .from(notificationTokens)
           .where(
@@ -97,17 +98,24 @@ export async function POST(req: NextRequest) {
           )
           .limit(1);
 
-        if (existingToken.length === 0) {
-          // Insert new token (platform defaults to 'android' for now)
+        if (existingToken.length > 0) {
+          // Token exists - update if inactive
+          if (!existingToken[0].isActive) {
+            await db
+              .update(notificationTokens)
+              .set({ isActive: true })
+              .where(eq(notificationTokens.id, existingToken[0].id));
+          }
+        } else {
+          // Insert new token with platform (defaults to 'android' if not provided)
           await db.insert(notificationTokens).values({
             id: crypto.randomUUID(),
             securityPersonnelId: guard.id,
             deviceToken: deviceToken,
-            platform: 'android',
+            platform: platform || 'android',
             isActive: true,
           });
         }
-        // If token exists, no need to update (already active)
       } catch (notifError) {
         // Silently fail notification token registration
         console.error('Failed to register notification token:', notifError);

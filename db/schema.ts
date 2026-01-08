@@ -178,7 +178,6 @@ export const notificationTokens = mysqlTable('notification_tokens', {
   platform: mysqlEnum('platform', ['ios', 'android']).notNull(),
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
 // 16. Notifications (Broadcast to all guests or all security)
