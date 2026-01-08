@@ -91,10 +91,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Store device notification token if provided
-    if (deviceToken && platform) {
+    if (deviceToken) {
       // Check if token already exists for this guest
       const existingToken = await db
-        .select()
+        .select({
+          id: notificationTokens.id,
+          deviceToken: notificationTokens.deviceToken,
+          isActive: notificationTokens.isActive,
+        })
         .from(notificationTokens)
         .where(
           and(
@@ -105,12 +109,11 @@ export async function POST(req: NextRequest) {
         .limit(1);
 
       if (existingToken.length > 0) {
-        // Update existing token (mark as active and update timestamp)
+        // Update existing token (mark as active)
         await db
           .update(notificationTokens)
           .set({
             isActive: true,
-            platform: platform,
           })
           .where(eq(notificationTokens.id, existingToken[0].id));
       } else {
@@ -120,12 +123,12 @@ export async function POST(req: NextRequest) {
           .set({ isActive: false })
           .where(eq(notificationTokens.guestId, guestUser.id));
 
-        // Insert new token
+        // Insert new token (platform defaults to 'android' for now)
         await db.insert(notificationTokens).values({
           id: crypto.randomUUID(),
           guestId: guestUser.id,
           deviceToken: deviceToken,
-          platform: platform,
+          platform: 'android',
           isActive: true,
         });
       }
