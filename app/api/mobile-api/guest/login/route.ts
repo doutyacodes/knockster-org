@@ -92,45 +92,35 @@ export async function POST(req: NextRequest) {
 
     // Store device notification token if provided
     if (deviceToken) {
-      // Check if token already exists for this guest
-      const existingToken = await db
-        .select({
-          id: notificationTokens.id,
-          deviceToken: notificationTokens.deviceToken,
-          isActive: notificationTokens.isActive,
-        })
-        .from(notificationTokens)
-        .where(
-          and(
-            eq(notificationTokens.guestId, guestUser.id),
-            eq(notificationTokens.deviceToken, deviceToken)
-          )
-        )
-        .limit(1);
-
-      if (existingToken.length > 0) {
-        // Update existing token (mark as active)
-        await db
-          .update(notificationTokens)
-          .set({
-            isActive: true,
+      try {
+        // Check if token already exists for this guest
+        const existingToken = await db
+          .select({
+            id: notificationTokens.id,
           })
-          .where(eq(notificationTokens.id, existingToken[0].id));
-      } else {
-        // Deactivate old tokens for this guest
-        await db
-          .update(notificationTokens)
-          .set({ isActive: false })
-          .where(eq(notificationTokens.guestId, guestUser.id));
+          .from(notificationTokens)
+          .where(
+            and(
+              eq(notificationTokens.guestId, guestUser.id),
+              eq(notificationTokens.deviceToken, deviceToken)
+            )
+          )
+          .limit(1);
 
-        // Insert new token (platform defaults to 'android' for now)
-        await db.insert(notificationTokens).values({
-          id: crypto.randomUUID(),
-          guestId: guestUser.id,
-          deviceToken: deviceToken,
-          platform: 'android',
-          isActive: true,
-        });
+        if (existingToken.length === 0) {
+          // Insert new token (platform defaults to 'android' for now)
+          await db.insert(notificationTokens).values({
+            id: crypto.randomUUID(),
+            guestId: guestUser.id,
+            deviceToken: deviceToken,
+            platform: 'android',
+            isActive: true,
+          });
+        }
+        // If token exists, no need to update (already active)
+      } catch (notifError) {
+        // Silently fail notification token registration
+        console.error('Failed to register notification token:', notifError);
       }
     }
 
