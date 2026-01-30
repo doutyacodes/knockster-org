@@ -1,26 +1,34 @@
-'use client';
+"use client";
 
-import React from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { ICONS, COLORS } from '../constants';
+import React from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { ICONS, COLORS } from "../constants";
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   onLogout?: () => void;
+  organizationName?: string;
+  organizationType?: string;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onLogout }) => {
+const Sidebar: React.FC<SidebarProps> = ({
+  isOpen,
+  onClose,
+  onLogout,
+  organizationName = "Management Console",
+  organizationType = "Organization",
+}) => {
   const pathname = usePathname();
 
   const navItems = [
-    { name: 'Dashboard', icon: ICONS.Dashboard, path: '/' },
-    { name: 'Invitations', icon: ICONS.Invitations, path: '/invitations' },
-    { name: 'Personnel', icon: ICONS.Personnel, path: '/personnel' },
+    { name: "Dashboard", icon: ICONS.Dashboard, path: "/" },
+    { name: "Invitations", icon: ICONS.Invitations, path: "/invitations" },
+    { name: "Personnel", icon: ICONS.Personnel, path: "/personnel" },
     // { name: 'Scan Logs', icon: ICONS.Logs, path: '/logs' }, // Hidden for now
-    { name: 'Alerts', icon: ICONS.Alerts, path: '/alerts' },
-    { name: 'My Profile', icon: ICONS.Profile, path: '/profile' },
+    { name: "Alerts", icon: ICONS.Alerts, path: "/alerts" },
+    { name: "My Profile", icon: ICONS.Profile, path: "/profile" },
   ];
 
   return (
@@ -38,7 +46,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onLogout }) => {
           fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200
           transform transition-transform duration-300 ease-in-out
           lg:relative lg:translate-x-0
-          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+          ${isOpen ? "translate-x-0" : "-translate-x-full"}
         `}
       >
         <div className="h-full flex flex-col">
@@ -65,8 +73,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onLogout }) => {
           <nav className="flex-1 px-4 py-4 space-y-1">
             {navItems.map((item) => {
               const isActive =
-                item.path === '/'
-                  ? pathname === '/'
+                item.path === "/"
+                  ? pathname === "/"
                   : pathname.startsWith(item.path);
 
               return (
@@ -79,17 +87,19 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onLogout }) => {
                     transition-all duration-200 group
                     ${
                       isActive
-                        ? 'bg-blue-50 text-blue-600 font-medium'
-                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                        ? "bg-blue-50 text-blue-600 font-medium"
+                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                     }
                   `}
                 >
                   <item.icon size={20} className="flex-shrink-0" />
                   <span>{item.name}</span>
 
-                  {item.name === 'Alerts' && (
-                    <span className="ml-auto w-5 h-5 bg-rose-500 text-white text-[10px]
-                      flex items-center justify-center rounded-full font-bold">
+                  {item.name === "Alerts" && (
+                    <span
+                      className="ml-auto w-5 h-5 bg-rose-500 text-white text-[10px]
+                      flex items-center justify-center rounded-full font-bold"
+                    >
                       2
                     </span>
                   )}
@@ -102,16 +112,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onLogout }) => {
           <div className="p-4 border-t border-slate-100 bg-slate-50/50">
             <div className="flex flex-col gap-4">
               <div className="flex items-center gap-3 px-2">
-                <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center
-                  justify-center text-slate-500 font-semibold">
+                <div
+                  className="w-10 h-10 rounded-full bg-slate-200 flex items-center
+                  justify-center text-slate-500 font-semibold"
+                >
                   HK
                 </div>
                 <div className="overflow-hidden">
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Managing Node
+                    {organizationType}
                   </p>
                   <p className="text-sm font-semibold text-slate-900 truncate">
-                    Hacker's Kingdom HQ
+                    {organizationName}
                   </p>
                 </div>
               </div>

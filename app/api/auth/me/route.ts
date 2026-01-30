@@ -1,10 +1,14 @@
-import { NextRequest } from 'next/server';
-import { eq } from 'drizzle-orm';
-import { db } from '@/db';
-import { orgAdmin } from '@/db/schema';
-import { authenticateRequest } from '@/lib/auth';
-import { successResponse, unauthorizedResponse, errorResponse } from '@/lib/api-response';
-import { toIST } from '@/lib/timezone';
+import { NextRequest } from "next/server";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { orgAdmin, organizationNode } from "@/db/schema";
+import { authenticateRequest } from "@/lib/auth";
+import {
+  successResponse,
+  unauthorizedResponse,
+  errorResponse,
+} from "@/lib/api-response";
+import { toIST } from "@/lib/timezone";
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,14 +16,14 @@ export async function GET(req: NextRequest) {
     const authResult = await authenticateRequest(req);
 
     if (!authResult.success || !authResult.payload) {
-      return unauthorizedResponse('Unauthorized');
+      return unauthorizedResponse("Unauthorized");
     }
 
     const { id, role } = authResult.payload;
 
     // Only org admins can access this endpoint
-    if (role !== 'orgadmin') {
-      return unauthorizedResponse('Unauthorized');
+    if (role !== "orgadmin") {
+      return unauthorizedResponse("Unauthorized");
     }
 
     // Fetch admin details
@@ -29,13 +33,19 @@ export async function GET(req: NextRequest) {
         email: orgAdmin.email,
         organizationNodeId: orgAdmin.organizationNodeId,
         createdAt: orgAdmin.createdAt,
+        organizationName: organizationNode.name,
+        organizationType: organizationNode.type,
       })
       .from(orgAdmin)
+      .leftJoin(
+        organizationNode,
+        eq(orgAdmin.organizationNodeId, organizationNode.id),
+      )
       .where(eq(orgAdmin.id, id!))
       .limit(1);
 
     if (!admin) {
-      return unauthorizedResponse('Admin not found');
+      return unauthorizedResponse("Admin not found");
     }
 
     return successResponse({
@@ -43,7 +53,7 @@ export async function GET(req: NextRequest) {
       createdAt: toIST(admin.createdAt),
     });
   } catch (error) {
-    console.error('Get profile error:', error);
-    return errorResponse('An error occurred', 500);
+    console.error("Get profile error:", error);
+    return errorResponse("An error occurred", 500);
   }
 }
