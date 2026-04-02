@@ -102,6 +102,7 @@ export async function GET(req: NextRequest) {
 
     // Format response
     const pendingL3Scans = recentL3Scans.map(scan => ({
+      scanId: scan.scanId,
       invitationId: scan.invitationId,
       guestName: scan.guestName || 'Unknown Guest',
       guestPhone: scan.guestPhone || 'N/A',
