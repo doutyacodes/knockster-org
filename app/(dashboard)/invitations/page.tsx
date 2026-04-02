@@ -172,7 +172,7 @@ const Invitations: React.FC = () => {
       </header>
 
       {/* Filter Tabs */}
-      <div className="bg-white p-1 rounded-2xl shadow-sm border border-slate-100 inline-flex flex-wrap md:flex-nowrap mb-2">
+      <div className="bg-white p-1.5 rounded-2xl shadow-sm border border-slate-100 inline-flex flex-wrap md:flex-nowrap mb-6 gap-1.5">
         {[
           { label: "All", value: "All" },
           { label: "Active", value: InvitationStatus.ACTIVE },
@@ -183,7 +183,11 @@ const Invitations: React.FC = () => {
           <button
             key={label}
             onClick={() => setFilter(value as any)}
-            className={filter === value ? "bg-blue-50 text-blue-600" : ""}
+            className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
+              filter === value
+                ? "bg-blue-600 text-white shadow-md shadow-blue-100"
+                : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+            }`}
           >
             {label}
           </button>
