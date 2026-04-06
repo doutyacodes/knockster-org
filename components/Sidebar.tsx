@@ -11,6 +11,7 @@ interface SidebarProps {
   onLogout?: () => void;
   organizationName?: string;
   organizationType?: string;
+  canManageHierarchy?: boolean;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -19,11 +20,15 @@ const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   organizationName = "Management Console",
   organizationType = "Organization",
+  canManageHierarchy = false,
 }) => {
   const pathname = usePathname();
 
   const navItems = [
     { name: "Dashboard", icon: ICONS.Dashboard, path: "/" },
+    ...(canManageHierarchy
+      ? [{ name: "Hierarchy", icon: ICONS.Layers, path: "/hierarchy" }]
+      : []),
     { name: "Invitations", icon: ICONS.Invitations, path: "/invitations" },
     { name: "Personnel", icon: ICONS.Personnel, path: "/personnel" },
     // { name: 'Scan Logs', icon: ICONS.Logs, path: '/logs' }, // Hidden for now

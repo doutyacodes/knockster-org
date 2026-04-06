@@ -27,7 +27,8 @@ export const organizationNode = mysqlTable('organization_node', {
   id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   parentId: varchar('parent_id', { length: 36 }),
   name: varchar('name', { length: 255 }).notNull(),
-  type: mysqlEnum('type', ['techpark', 'block', 'building', 'company', 'gate', 'custom']).notNull(),
+  type: mysqlEnum('type', ['techpark', 'block', 'building', 'company', 'gate', 'school', 'classroom', 'lab', 'custom']).notNull(),
+  maxSubNodes: int('max_sub_nodes').default(0).notNull(),
   planOverrideLevel: int('plan_override_level'),
   status: mysqlEnum('status', ['active', 'suspended']).default('active').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -65,6 +66,7 @@ export const orgAdmin = mysqlTable('org_admin', {
   email: varchar('email', { length: 255 }).notNull().unique(),
   passwordHash: text('password_hash').notNull(),
   status: mysqlEnum('status', ['active', 'disabled']).default('active').notNull(),
+  canManageHierarchy: boolean('can_manage_hierarchy').default(false).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

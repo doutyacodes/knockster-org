@@ -33,8 +33,10 @@ export async function GET(req: NextRequest) {
         email: orgAdmin.email,
         organizationNodeId: orgAdmin.organizationNodeId,
         createdAt: orgAdmin.createdAt,
+        canManageHierarchy: orgAdmin.canManageHierarchy,
         organizationName: organizationNode.name,
         organizationType: organizationNode.type,
+        maxSubNodes: organizationNode.maxSubNodes,
       })
       .from(orgAdmin)
       .leftJoin(
