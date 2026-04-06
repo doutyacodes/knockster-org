@@ -7,7 +7,8 @@ import {
   decimal,
   json,
   mysqlEnum,
-  text
+  text,
+  AnyMySqlColumn
 } from 'drizzle-orm/mysql-core';
 import { relations } from 'drizzle-orm';
 
@@ -25,7 +26,7 @@ export const superAdmin = mysqlTable('super_admin', {
 // 2. Organization Node (Hierarchical Tree)
 export const organizationNode = mysqlTable('organization_node', {
   id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
-  parentId: varchar('parent_id', { length: 36 }),
+  parentId: varchar('parent_id', { length: 36 }).references((): AnyMySqlColumn => organizationNode.id, { onDelete: 'cascade' }),
   name: varchar('name', { length: 255 }).notNull(),
   type: mysqlEnum('type', ['techpark', 'block', 'building', 'company', 'gate', 'school', 'classroom', 'lab', 'custom']).notNull(),
   maxSubNodes: int('max_sub_nodes').default(0).notNull(),
@@ -51,7 +52,7 @@ export const subscriptionPlan = mysqlTable('subscription_plan', {
 // 4. Organization Plan (Bridge: org → plan)
 export const organizationPlan = mysqlTable('organization_plan', {
   id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
-  organizationNodeId: varchar('organization_node_id', { length: 36 }).notNull(),
+  organizationNodeId: varchar('organization_node_id', { length: 36 }).notNull().references(() => organizationNode.id, { onDelete: 'cascade' }),
   subscriptionPlanId: varchar('subscription_plan_id', { length: 36 }).notNull(),
   startDate: timestamp('start_date').notNull(),
   endDate: timestamp('end_date'),
@@ -62,7 +63,7 @@ export const organizationPlan = mysqlTable('organization_plan', {
 // 5. Org Admin
 export const orgAdmin = mysqlTable('org_admin', {
   id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
-  organizationNodeId: varchar('organization_node_id', { length: 36 }).notNull(),
+  organizationNodeId: varchar('organization_node_id', { length: 36 }).notNull().references(() => organizationNode.id, { onDelete: 'cascade' }),
   email: varchar('email', { length: 255 }).notNull().unique(),
   passwordHash: text('password_hash').notNull(),
   status: mysqlEnum('status', ['active', 'disabled']).default('active').notNull(),
@@ -73,7 +74,7 @@ export const orgAdmin = mysqlTable('org_admin', {
 // 6. Security Personnel
 export const securityPersonnel = mysqlTable('security_personnel', {
   id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
-  organizationNodeId: varchar('organization_node_id', { length: 36 }).notNull(),
+  organizationNodeId: varchar('organization_node_id', { length: 36 }).notNull().references(() => organizationNode.id, { onDelete: 'cascade' }),
   username: varchar('username', { length: 100 }).notNull().unique(),
   passwordHash: text('password_hash').notNull(),
   shiftStartTime: varchar('shift_start_time', { length: 5 }), // HH:MM format
@@ -115,7 +116,7 @@ export const guestDevice = mysqlTable('guest_device', {
 // 10. Guest Invitation
 export const guestInvitation = mysqlTable('guest_invitation', {
   id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
-  organizationNodeId: varchar('organization_node_id', { length: 36 }).notNull(),
+  organizationNodeId: varchar('organization_node_id', { length: 36 }).notNull().references(() => organizationNode.id, { onDelete: 'cascade' }),
   guestId: varchar('guest_id', { length: 36 }).notNull(),
   employeeName: varchar('employee_name', { length: 255 }).notNull(),
   employeePhone: varchar('employee_phone', { length: 20 }).notNull(),
@@ -215,7 +216,7 @@ export const auditLog = mysqlTable('audit_log', {
 // 19. Billing Record
 export const billingRecord = mysqlTable('billing_record', {
   id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
-  organizationNodeId: varchar('organization_node_id', { length: 36 }).notNull(),
+  organizationNodeId: varchar('organization_node_id', { length: 36 }).notNull().references(() => organizationNode.id, { onDelete: 'cascade' }),
   subscriptionPlanId: varchar('subscription_plan_id', { length: 36 }).notNull(),
   paymentReference: varchar('payment_reference', { length: 255 }),
   amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
@@ -226,7 +227,7 @@ export const billingRecord = mysqlTable('billing_record', {
 // 20. Geo Gate Location (Optional)
 export const geoGateLocation = mysqlTable('geo_gate_location', {
   id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
-  organizationNodeId: varchar('organization_node_id', { length: 36 }).notNull(),
+  organizationNodeId: varchar('organization_node_id', { length: 36 }).notNull().references(() => organizationNode.id, { onDelete: 'cascade' }),
   latitude: decimal('latitude', { precision: 10, scale: 8 }).notNull(),
   longitude: decimal('longitude', { precision: 11, scale: 8 }).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),

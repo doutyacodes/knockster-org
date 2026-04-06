@@ -12,6 +12,7 @@ import {
   CheckCircle,
   MoreVertical,
   ChevronRight,
+  GitBranch,
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 
@@ -20,6 +21,7 @@ interface SubNode {
   name: string;
   type: string;
   status: string;
+  parentId: string | null;
   createdAt: string;
 }
 
@@ -51,7 +53,10 @@ export default function HierarchyPage() {
   const [form, setForm] = useState({
     name: "",
     type: "classroom",
+    parentId: "" as string | undefined,
   });
+
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [selectedNodeForAdmins, setSelectedNodeForAdmins] = useState<SubNode | null>(null);
@@ -88,13 +93,28 @@ export default function HierarchyPage() {
 
     try {
       await api.post("/api/organizations/sub-nodes", form);
-      setSuccess("Sub-node created successfully!");
+      setSuccess("Node created successfully!");
       setIsModalOpen(false);
-      setForm({ name: "", type: "classroom" });
+      setForm({ name: "", type: "classroom", parentId: undefined });
       fetchData();
       setTimeout(() => setSuccess(""), 3000);
     } catch (err: any) {
       setError(err.message || "Failed to create node");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      setSubmitting(true);
+      await api.delete(`/api/organizations/sub-nodes?id=${id}`);
+      setSuccess("Node and all descendants deleted successfully");
+      setDeleteConfirmId(null);
+      fetchData();
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err: any) {
+      setError(err.message || "Failed to delete node");
     } finally {
       setSubmitting(false);
     }
@@ -132,7 +152,31 @@ export default function HierarchyPage() {
     }
   };
 
-  const filteredNodes = subNodes.filter(node => 
+  // Helper to build a flattened list with depth info for the table
+  const flattenedWithDepth = React.useMemo(() => {
+    if (!user) return [];
+    
+    const result: (SubNode & { depth: number })[] = [];
+    
+    const build = (parentId: string | null, depth: number) => {
+      const children = subNodes.filter(n => (n.parentId === parentId) || (parentId === null && n.parentId === user.organizationNodeId));
+      children.forEach(child => {
+        result.push({ ...child, depth });
+        build(child.id, depth + 1);
+      });
+    };
+    
+    // Start from the user's root node's children
+    const directChildren = subNodes.filter(n => n.parentId === user.organizationNodeId);
+    directChildren.forEach(node => {
+      result.push({ ...node, depth: 0 });
+      build(node.id, 1);
+    });
+    
+    return result;
+  }, [subNodes, user]);
+
+  const filteredNodes = flattenedWithDepth.filter(node => 
     node.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     node.type.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -158,6 +202,10 @@ export default function HierarchyPage() {
       );
   }
 
+  const selectedParentName = form.parentId 
+    ? subNodes.find(n => n.id === form.parentId)?.name 
+    : user?.organizationName;
+
   return (
     <div className="space-y-6">
       {success && (
@@ -177,17 +225,20 @@ export default function HierarchyPage() {
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Campus Hierarchy</h1>
-          <p className="text-slate-500">Manage classrooms, buildings, and specialized units for {user?.organizationName}.</p>
+          <p className="text-slate-500">Structured view of your organizational units.</p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            setForm({ name: "", type: "building", parentId: undefined });
+            setIsModalOpen(true);
+          }}
           disabled={isQuotaFull}
           className={`flex items-center justify-center space-x-2 px-5 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-blue-200
             ${isQuotaFull ? 'bg-slate-200 text-slate-500 shadow-none cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}
           `}
         >
           <Plus className="w-5 h-5" />
-          <span>Add Sub-Node</span>
+          <span>Add Root Unit</span>
         </button>
       </header>
 
@@ -218,7 +269,7 @@ export default function HierarchyPage() {
                   <Building2 className="text-indigo-600 w-6 h-6" />
               </div>
               <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Parent Organization</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Organization</p>
                   <p className="text-sm font-semibold text-slate-800 truncate">{user?.organizationName}</p>
               </div>
           </div>
@@ -243,7 +294,7 @@ export default function HierarchyPage() {
           <table className="w-full text-left">
             <thead className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider">
               <tr>
-                <th className="px-6 py-4">Unit Name</th>
+                <th className="px-6 py-4">Hierarchy Structure</th>
                 <th className="px-6 py-4">Type</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Actions</th>
@@ -252,35 +303,60 @@ export default function HierarchyPage() {
             <tbody className="divide-y divide-slate-100 text-sm">
               {filteredNodes.length > 0 ? (
                 filteredNodes.map((node) => (
-                  <tr key={node.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 flex items-center gap-3">
-                      <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
-                        <Building2 className="w-4 h-4 text-slate-500" />
+                  <tr key={node.id} className="hover:bg-slate-50/50 transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2" style={{ paddingLeft: `${node.depth * 28}px` }}>
+                        <div className="flex items-center">
+                            {node.depth > 0 && <span className="text-slate-300 mr-1">└</span>}
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${node.depth === 0 ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
+                                <Building2 className="w-4 h-4" />
+                            </div>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="font-semibold text-slate-800 leading-tight">{node.name}</span>
+                            {node.depth > 0 && <span className="text-[10px] text-slate-400">Sub-node</span>}
+                        </div>
                       </div>
-                      <span className="font-semibold text-slate-800">{node.name}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="capitalize text-slate-600">{node.type}</span>
+                      <span className="capitalize px-2 py-1 bg-slate-100 rounded text-slate-600 text-xs font-medium">{node.type}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-[11px] font-bold">
+                      <span className="flex items-center gap-1.5 text-emerald-600 font-medium text-xs">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                         {node.status}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2 text-right">
+                      <div className="flex justify-end items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
+                             title="Add Sub-Unit"
+                             onClick={() => {
+                                 setForm({ name: "", type: "classroom", parentId: node.id });
+                                 setIsModalOpen(true);
+                             }}
+                             disabled={isQuotaFull}
+                             className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-30"
+                        >
+                            <GitBranch className="w-4 h-4" />
+                        </button>
+                        <button 
+                          title="Manage Admins"
                           onClick={() => {
                             setSelectedNodeForAdmins(node);
                             fetchNodeAdmins(node.id);
                             setIsAdminModalOpen(true);
                           }}
-                          className="px-3 py-1.5 border border-slate-200 text-slate-600 rounded-lg text-xs font-semibold hover:bg-slate-50 transition-colors"
+                          className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                         >
-                          Manage Admins
-                        </button>
-                        <button className="p-2 text-slate-400 hover:text-slate-600 transition-colors">
                           <MoreVertical className="w-4 h-4" />
+                        </button>
+                        <button 
+                            title="Delete Unit"
+                            onClick={() => setDeleteConfirmId(node.id)}
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
@@ -289,7 +365,10 @@ export default function HierarchyPage() {
               ) : (
                 <tr>
                   <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
-                    No sub-nodes found. {isQuotaFull ? "You have reached your quota limit." : "Click 'Add Sub-Node' to create your first unit."}
+                    <div className="flex flex-col items-center gap-2">
+                        <Layers className="w-8 h-8 opacity-20" />
+                        <p>No units found. {isQuotaFull ? "Quota reached." : "Start building your hierarchy."}</p>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -298,17 +377,52 @@ export default function HierarchyPage() {
         </div>
       </div>
 
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
+              <div className="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-in zoom-in-95">
+                  <div className="w-12 h-12 bg-rose-50 rounded-xl flex items-center justify-center mb-4">
+                      <Trash2 className="w-6 h-6 text-rose-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-800 mb-2">Delete this unit?</h3>
+                  <p className="text-sm text-slate-500 mb-6 font-medium bg-rose-50/50 p-3 rounded-lg border border-rose-100">
+                      WARNING: This will permanently delete all sub-units, assigned admins, and security staff within this branch.
+                  </p>
+                  <div className="flex gap-3">
+                      <button 
+                        onClick={() => setDeleteConfirmId(null)}
+                        className="flex-1 px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
+                      >
+                          Cancel
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(deleteConfirmId!)}
+                        disabled={submitting}
+                        className="flex-1 px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-semibold hover:bg-rose-700 transition-colors disabled:opacity-50"
+                      >
+                          {submitting ? 'Deleting...' : 'Confirm Delete'}
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* Create Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-xl font-bold text-slate-800">Add New Unit</h3>
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div>
+                <h3 className="text-xl font-bold text-slate-800">Create New Unit</h3>
+                <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                    Parent: <span className="text-blue-600 font-semibold">{selectedParentName}</span>
+                </p>
+              </div>
               <button 
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-1 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200"
               >
-                <Plus className="w-6 h-6 rotate-45 text-slate-400" />
+                <Plus className="w-5 h-5 rotate-45 text-slate-400" />
               </button>
             </div>
             <form className="p-6 space-y-4" onSubmit={handleCreate}>
@@ -370,10 +484,10 @@ export default function HierarchyPage() {
       {isAdminModalOpen && selectedNodeForAdmins && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div>
-                <h3 className="text-xl font-bold text-slate-800">Manage Admins</h3>
-                <p className="text-xs text-slate-500">For {selectedNodeForAdmins.name}</p>
+                <h3 className="text-xl font-bold text-slate-800">Manage Unit Admins</h3>
+                <p className="text-xs text-slate-500">Admins for: <span className="font-semibold text-blue-600">{selectedNodeForAdmins.name}</span></p>
               </div>
               <button 
                 onClick={() => setIsAdminModalOpen(false)}
