@@ -16,6 +16,7 @@ interface User {
   organizationNodeId: string;
   canManageHierarchy: boolean;
   maxSubNodes: number;
+  imageUrl?: string;
 }
 
 export default function DashboardLayout({
@@ -100,6 +101,7 @@ export default function DashboardLayout({
         organizationName={user?.organizationName}
         organizationType={user?.organizationType}
         canManageHierarchy={user?.canManageHierarchy}
+        imageUrl={user?.imageUrl}
       />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Topbar

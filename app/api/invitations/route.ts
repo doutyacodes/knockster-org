@@ -5,6 +5,8 @@ import { guestInvitation, guest, orgAdmin } from '@/db/schema';
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, errorResponse, unauthorizedResponse } from '@/lib/api-response';
 import { toIST, fromIST } from '@/lib/timezone';
+import { checkCanCreateInvitation } from '@/lib/subscription';
+import { visitorType } from '@/db/schema';
 
 // Map database status to frontend status
 const mapStatusToFrontend = (dbStatus: string): string => {
@@ -130,19 +132,34 @@ export async function POST(req: NextRequest) {
       validFrom,
       validTo,
       securityLevel,
+      visitorTypeId,
     } = body;
 
     // Validate required fields
-    if (!employeeName || !employeePhone || !guestName || !guestPhone || !validFrom || !validTo || !securityLevel) {
+    if (!employeeName || !employeePhone || !guestName || !guestPhone || !validFrom || !validTo || !visitorTypeId) {
       return errorResponse('All fields are required', 400);
     }
 
-    // Parse security level (convert L1, L2, L3, L4 to 1, 2, 3, 4)
-    const securityLevelNum = parseInt(securityLevel.replace('L', ''));
-    
+    let securityLevelNum: number;
+
+    if (securityLevel) {
+       securityLevelNum = parseInt(securityLevel.replace('L', ''));
+    } else {
+       // Fetch default from visitor type
+       const [vt] = await db.select().from(visitorType).where(eq(visitorType.id, visitorTypeId)).limit(1);
+       if (!vt) return errorResponse('Invalid visitor type', 400);
+       securityLevelNum = vt.defaultSecurityLevel;
+    }
+
     // Validate security level
     if (![1, 2, 3, 4].includes(securityLevelNum)) {
       return errorResponse('Invalid security level', 400);
+    }
+
+    // Check subscription plan limits
+    const planCheck = await checkCanCreateInvitation(organizationNodeId!, securityLevelNum);
+    if (!planCheck.allowed) {
+      return errorResponse(planCheck.error || 'Subscription limit reached', 403);
     }
 
     // Convert IST dates from frontend to UTC for database
@@ -203,6 +220,7 @@ export async function POST(req: NextRequest) {
         guestId,
         organizationNodeId: organizationNodeId!,
         createdByOrgAdminId: adminId!,
+        visitorTypeId,
         employeeName,
         employeePhone,
         validFrom: validFromDate,

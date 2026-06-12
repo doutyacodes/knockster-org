@@ -12,6 +12,7 @@ interface SidebarProps {
   organizationName?: string;
   organizationType?: string;
   canManageHierarchy?: boolean;
+  imageUrl?: string;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -21,6 +22,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   organizationName = "Management Console",
   organizationType = "Organization",
   canManageHierarchy = false,
+  imageUrl,
 }) => {
   const pathname = usePathname();
 
@@ -33,8 +35,13 @@ const Sidebar: React.FC<SidebarProps> = ({
     { name: "Personnel", icon: ICONS.Personnel, path: "/personnel" },
     // { name: 'Scan Logs', icon: ICONS.Logs, path: '/logs' }, // Hidden for now
     { name: "Alerts", icon: ICONS.Alerts, path: "/alerts" },
+    { name: "Visitor Types", icon: ICONS.Users, path: "/visitor-types" },
     { name: "My Profile", icon: ICONS.Profile, path: "/profile" },
   ];
+
+  const displayImageUrl = imageUrl?.startsWith('http') 
+    ? imageUrl 
+    : imageUrl ? `https://wowfy.in/testusr/images/${imageUrl}` : null;
 
   return (
     <>
@@ -57,14 +64,28 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="h-full flex flex-col">
           {/* Logo */}
           <div className="p-6 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <ICONS.ShieldCheck className="text-white w-5 h-5" />
+            {displayImageUrl ? (
+              <div className="flex items-center gap-3">
+                <img src={displayImageUrl} alt={organizationName} className="h-12 w-12 shrink-0 object-cover border-4 border-white ring-1 ring-slate-200 rounded-xl bg-white shadow-sm" />
+                <div className="overflow-hidden">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                    {organizationType}
+                  </p>
+                  <p className="text-sm font-black text-slate-900 truncate max-w-[120px]">
+                    {organizationName}
+                  </p>
+                </div>
               </div>
-              <span className="text-xl font-bold text-slate-900 tracking-tight">
-                Knockster
-              </span>
-            </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                  <ICONS.ShieldCheck className="text-white w-5 h-5" />
+                </div>
+                <span className="text-xl font-bold text-slate-900 tracking-tight">
+                  Knockster
+                </span>
+              </div>
+            )}
 
             <button
               onClick={onClose}
@@ -117,12 +138,16 @@ const Sidebar: React.FC<SidebarProps> = ({
           <div className="p-4 border-t border-slate-100 bg-slate-50/50">
             <div className="flex flex-col gap-4">
               <div className="flex items-center gap-3 px-2">
-                <div
-                  className="w-10 h-10 rounded-full bg-slate-200 flex items-center
-                  justify-center text-slate-500 font-semibold"
-                >
-                  HK
-                </div>
+                {displayImageUrl ? (
+                  <img src={displayImageUrl} alt="Logo" className="w-10 h-10 shrink-0 rounded-full object-cover border-2 border-white ring-1 ring-slate-200 shadow-sm" />
+                ) : (
+                  <div
+                    className="w-10 h-10 shrink-0 rounded-full bg-slate-200 flex items-center
+                    justify-center text-slate-500 font-semibold"
+                  >
+                    {organizationName?.[0]?.toUpperCase() || "O"}
+                  </div>
+                )}
                 <div className="overflow-hidden">
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
                     {organizationType}

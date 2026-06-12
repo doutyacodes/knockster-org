@@ -5,6 +5,7 @@ import { securityPersonnel, guardDevice } from '@/db/schema';
 import { authenticateRequest, hashPassword } from '@/lib/auth';
 import { successResponse, errorResponse, unauthorizedResponse } from '@/lib/api-response';
 import { toIST } from '@/lib/timezone';
+import { checkCanCreateGuard } from '@/lib/subscription';
 
 // GET /api/personnel - Get all security personnel for the org
 export async function GET(req: NextRequest) {
@@ -82,6 +83,12 @@ export async function POST(req: NextRequest) {
     // Validate required fields
     if (!username || !password) {
       return errorResponse('Username and password are required', 400);
+    }
+
+    // Check subscription plan limits
+    const planCheck = await checkCanCreateGuard(organizationNodeId!);
+    if (!planCheck.allowed) {
+      return errorResponse(planCheck.error || 'Subscription limit reached', 403);
     }
 
     // Check if username already exists

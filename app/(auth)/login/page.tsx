@@ -140,7 +140,8 @@ const LoginPage = () => {
           Authorized Org Admin access only.
           <br />
           IP logging and behavioral analysis active.
-          {/* test */}
+          <br />
+          <a href="/signup" className="text-blue-500 underline mt-2 inline-block">Need an account? Sign up</a>
         </p>
       </div>
     </div>

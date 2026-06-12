@@ -21,6 +21,7 @@ const Invitations: React.FC = () => {
   const [filter, setFilter] = useState<InvitationStatus | "All">("All");
   const [showModal, setShowModal] = useState(false);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [visitorTypes, setVisitorTypes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
@@ -35,6 +36,7 @@ const Invitations: React.FC = () => {
     validFrom: "",
     validTo: "",
     securityLevel: "L1", // Changed from 1 to "L1"
+    visitorTypeId: "",
   });
 
   // Fetch invitations
@@ -69,8 +71,24 @@ const Invitations: React.FC = () => {
     }
   };
 
+  const fetchVisitorTypes = async () => {
+    try {
+      const token = localStorage.getItem("knockster_token");
+      const response = await fetch("/api/visitor-types", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setVisitorTypes(data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching visitor types:", error);
+    }
+  };
+
   useEffect(() => {
     fetchInvitations();
+    fetchVisitorTypes();
   }, []);
 
   // Handle form submission
@@ -85,7 +103,8 @@ const Invitations: React.FC = () => {
       !formData.guestName ||
       !formData.guestPhone ||
       !formData.validFrom ||
-      !formData.validTo
+      !formData.validTo ||
+      !formData.visitorTypeId
     ) {
       setError("All fields are required");
       return;
@@ -120,6 +139,7 @@ const Invitations: React.FC = () => {
         validFrom: "",
         validTo: "",
         securityLevel: "L1",
+        visitorTypeId: "",
       });
       setShowModal(false);
 
@@ -472,6 +492,29 @@ const Invitations: React.FC = () => {
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                   Access Control
                 </p>
+                <div className="space-y-1.5 mb-4">
+                  <label className="text-sm font-semibold text-slate-700">
+                    Visitor Type
+                  </label>
+                  <select
+                    value={formData.visitorTypeId}
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      const vt = visitorTypes.find(v => v.id === selectedId);
+                      setFormData({ 
+                        ...formData, 
+                        visitorTypeId: selectedId,
+                        securityLevel: vt ? `L${vt.defaultSecurityLevel}` : formData.securityLevel
+                      });
+                    }}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all text-sm"
+                  >
+                    <option value="" disabled>Select a visitor type</option>
+                    {visitorTypes.map(vt => (
+                      <option key={vt.id} value={vt.id}>{vt.name} (Default L{vt.defaultSecurityLevel})</option>
+                    ))}
+                  </select>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-sm font-semibold text-slate-700">

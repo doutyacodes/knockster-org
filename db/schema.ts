@@ -28,6 +28,7 @@ export const organizationNode = mysqlTable('organization_node', {
   id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   parentId: varchar('parent_id', { length: 36 }).references((): AnyMySqlColumn => organizationNode.id, { onDelete: 'cascade' }),
   name: varchar('name', { length: 255 }).notNull(),
+  imageUrl: varchar('image_url', { length: 500 }).notNull().default(''),
   type: mysqlEnum('type', ['techpark', 'block', 'building', 'company', 'gate', 'school', 'classroom', 'lab', 'custom']).notNull(),
   maxSubNodes: int('max_sub_nodes').default(0).notNull(),
   planOverrideLevel: int('plan_override_level'),
@@ -113,11 +114,21 @@ export const guestDevice = mysqlTable('guest_device', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+// 9.5 Visitor Type
+export const visitorType = mysqlTable('visitor_type', {
+  id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  organizationNodeId: varchar('organization_node_id', { length: 36 }).notNull().references(() => organizationNode.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 100 }).notNull(),
+  defaultSecurityLevel: int('default_security_level').notNull().default(1),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 // 10. Guest Invitation
 export const guestInvitation = mysqlTable('guest_invitation', {
   id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   organizationNodeId: varchar('organization_node_id', { length: 36 }).notNull().references(() => organizationNode.id, { onDelete: 'cascade' }),
   guestId: varchar('guest_id', { length: 36 }).notNull(),
+  visitorTypeId: varchar('visitor_type_id', { length: 36 }),
   employeeName: varchar('employee_name', { length: 255 }).notNull(),
   employeePhone: varchar('employee_phone', { length: 20 }).notNull(),
   validFrom: timestamp('valid_from').notNull(),
@@ -250,6 +261,7 @@ export const organizationNodeRelations = relations(organizationNode, ({ one, man
   organizationPlans: many(organizationPlan),
   billingRecords: many(billingRecord),
   geoGateLocation: one(geoGateLocation),
+  visitorTypes: many(visitorType),
 }));
 
 export const subscriptionPlanRelations = relations(subscriptionPlan, ({ many }) => ({
@@ -308,6 +320,14 @@ export const guestDeviceRelations = relations(guestDevice, ({ one }) => ({
   }),
 }));
 
+export const visitorTypeRelations = relations(visitorType, ({ one, many }) => ({
+  organizationNode: one(organizationNode, {
+    fields: [visitorType.organizationNodeId],
+    references: [organizationNode.id],
+  }),
+  invitations: many(guestInvitation),
+}));
+
 export const guestInvitationRelations = relations(guestInvitation, ({ one, many }) => ({
   organizationNode: one(organizationNode, {
     fields: [guestInvitation.organizationNodeId],
@@ -316,6 +336,10 @@ export const guestInvitationRelations = relations(guestInvitation, ({ one, many 
   guest: one(guest, {
     fields: [guestInvitation.guestId],
     references: [guest.id],
+  }),
+  visitorType: one(visitorType, {
+    fields: [guestInvitation.visitorTypeId],
+    references: [visitorType.id],
   }),
   createdBy: one(orgAdmin, {
     fields: [guestInvitation.createdByOrgAdminId],

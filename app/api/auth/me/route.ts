@@ -37,6 +37,7 @@ export async function GET(req: NextRequest) {
         organizationName: organizationNode.name,
         organizationType: organizationNode.type,
         maxSubNodes: organizationNode.maxSubNodes,
+        imageUrl: organizationNode.imageUrl,
       })
       .from(orgAdmin)
       .leftJoin(

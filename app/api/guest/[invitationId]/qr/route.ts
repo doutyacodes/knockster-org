@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { eq, and, gte, desc } from 'drizzle-orm';
 import { db } from '@/db';
-import { guestInvitation, guestQrSession, guestOtp } from '@/db/schema';
+import { guestInvitation, guestQrSession, guestOtp, guest, organizationNode } from '@/db/schema';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 import crypto from 'crypto';
 
@@ -14,22 +14,37 @@ export async function GET(
     const { invitationId } = await params;
 
     // Fetch invitation details
-    const [invitation] = await db
+    const [invitationData] = await db
       .select({
-        id: guestInvitation.id,
-        guestId: guestInvitation.guestId,
-        securityLevel: guestInvitation.requestedSecurityLevel,
-        validFrom: guestInvitation.validFrom,
-        validTo: guestInvitation.validTo,
-        status: guestInvitation.status,
+        invitation: {
+          id: guestInvitation.id,
+          guestId: guestInvitation.guestId,
+          securityLevel: guestInvitation.requestedSecurityLevel,
+          validFrom: guestInvitation.validFrom,
+          validTo: guestInvitation.validTo,
+          status: guestInvitation.status,
+          employeeName: guestInvitation.employeeName,
+        },
+        guest: {
+          name: guest.name,
+        },
+        organization: {
+          name: organizationNode.name,
+          type: organizationNode.type,
+          imageUrl: organizationNode.imageUrl,
+        }
       })
       .from(guestInvitation)
+      .innerJoin(guest, eq(guestInvitation.guestId, guest.id))
+      .innerJoin(organizationNode, eq(guestInvitation.organizationNodeId, organizationNode.id))
       .where(eq(guestInvitation.id, invitationId))
       .limit(1);
 
-    if (!invitation) {
+    if (!invitationData) {
       return notFoundResponse('Invitation not found');
     }
+
+    const { invitation, guest: guestInfo, organization } = invitationData;
 
     // Check if invitation is valid
     const now = new Date();
@@ -156,6 +171,13 @@ export async function GET(
         validFrom: invitation.validFrom,
         validTo: invitation.validTo,
         status: invitation.status,
+        employeeName: invitation.employeeName,
+        guestName: guestInfo.name,
+      },
+      organization: {
+        name: organization.name,
+        type: organization.type,
+        imageUrl: organization.imageUrl,
       },
       qrExpirySeconds,
       otpExpirySeconds,

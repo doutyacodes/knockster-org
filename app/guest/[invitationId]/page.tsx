@@ -21,6 +21,13 @@ interface QRData {
     validFrom: string;
     validTo: string;
     status: string;
+    employeeName: string;
+    guestName: string;
+  };
+  organization: {
+    name: string;
+    type: string;
+    imageUrl: string;
   };
   qrExpirySeconds: number;
   otpExpirySeconds: number;
@@ -126,20 +133,28 @@ export default function GuestQRPage() {
   const securityLevel = `L${qrData.invitation.securityLevel}` as keyof typeof SECURITY_INFO;
   const securityInfo = SECURITY_INFO[securityLevel];
 
+  const displayImageUrl = qrData.organization?.imageUrl?.startsWith('http') 
+    ? qrData.organization.imageUrl 
+    : qrData.organization?.imageUrl ? `https://wowfy.in/testusr/images/${qrData.organization.imageUrl}` : null;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-slate-100 p-4 flex items-center justify-center">
       <div className="max-w-lg w-full space-y-6">
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-blue-200">
-            <ICONS.ShieldCheck className="text-white w-8 h-8" />
-          </div>
+          {displayImageUrl ? (
+            <img src={displayImageUrl} alt="Organization Logo" className="h-20 w-20 shrink-0 object-cover border-4 border-white ring-1 ring-slate-200 rounded-2xl mx-auto shadow-xl" />
+          ) : (
+            <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-blue-200">
+              <span className="text-3xl font-black text-white">{qrData.organization?.name?.[0]?.toUpperCase() || 'O'}</span>
+            </div>
+          )}
           <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-              Knockster
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight px-4">
+              {qrData.organization?.name || 'Organization'}
             </h1>
-            <p className="text-slate-500 mt-1 font-semibold">
-              Visitor Access Pass
+            <p className="text-slate-500 mt-1 font-bold uppercase tracking-widest text-[10px]">
+              {qrData.organization?.type || 'Visitor Pass'}
             </p>
           </div>
         </div>
@@ -171,7 +186,7 @@ export default function GuestQRPage() {
                 />
               </div>
 
-              {/* QR Countdown */}
+            {/* QR Countdown */}
               <div className="mt-6 text-center">
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-md border border-slate-200">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
@@ -182,6 +197,18 @@ export default function GuestQRPage() {
                 <p className="text-xs text-slate-500 mt-3">
                   QR code rotates every {qrData.qrExpirySeconds / 60} minutes for security
                 </p>
+              </div>
+            </div>
+
+            {/* Guest & Host Info */}
+            <div className="mt-6 p-4 bg-slate-50 rounded-2xl border border-slate-200 grid grid-cols-2 gap-4 text-left shadow-sm">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Guest</p>
+                <p className="font-bold text-slate-900 truncate">{qrData.invitation.guestName || 'Visitor'}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Host</p>
+                <p className="font-bold text-slate-900 truncate">{qrData.invitation.employeeName || 'Employee'}</p>
               </div>
             </div>
 
@@ -267,9 +294,17 @@ export default function GuestQRPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-xs text-slate-400">
-          Keep this page open for entry. Do not share this QR code or OTP.
-        </p>
+        <div className="text-center mt-8 space-y-4">
+          <p className="text-[11px] text-slate-500 font-medium px-4">
+            Keep this page open for entry. Do not share this QR code or OTP.
+          </p>
+          <div className="flex flex-col items-center justify-center gap-1.5 pt-6 pb-2">
+            <ICONS.ShieldCheck className="text-slate-300 w-5 h-5" />
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Powered by Knockster
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

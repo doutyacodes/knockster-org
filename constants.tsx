@@ -24,7 +24,8 @@ import {
   Layers,
   Link,
   Info,
-  Key
+  Key,
+  Users
 } from 'lucide-react';
 
 export const COLORS = {
@@ -65,7 +66,9 @@ export const ICONS = {
   Layers: Layers,
   Link: Link,
   Info: Info,
-  Key: Key
+  Key: Key,
+  Plus: Plus,
+  Users: Users
 };
 
 export const SECURITY_INFO = {
