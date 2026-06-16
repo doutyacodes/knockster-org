@@ -3,18 +3,11 @@
 import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { ICONS, SECURITY_INFO } from "@/constants";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface QRData {
-  qrSession: {
-    qrCode: string;
-    expiresAt: string;
-    createdAt: string;
-  };
-  otp: {
-    otpCode: string;
-    expiresAt: string;
-    createdAt: string;
-  } | null;
+  qrSession: { qrCode: string; expiresAt: string; createdAt: string };
+  otp: { otpCode: string; expiresAt: string; createdAt: string } | null;
   invitation: {
     id: number;
     securityLevel: number;
@@ -24,11 +17,7 @@ interface QRData {
     employeeName: string;
     guestName: string;
   };
-  organization: {
-    name: string;
-    type: string;
-    imageUrl: string;
-  };
+  organization: { name: string; type: string; imageUrl: string };
   qrExpirySeconds: number;
   otpExpirySeconds: number;
 }
@@ -47,66 +36,44 @@ export default function GuestQRPage() {
     try {
       setLoading(true);
       setError('');
-
       const response = await fetch(`/api/guest/${invitationId}/qr`);
       const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to load QR code');
-      }
-
+      if (!response.ok || !data.success) throw new Error(data.error || 'Failed to load QR code');
       setQrData(data.data);
-      setLoading(false);
     } catch (error: any) {
-      console.error('Error fetching QR data:', error);
       setError(error.message || 'Failed to load QR code');
+    } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchQRData();
-  }, [invitationId]);
+  useEffect(() => { fetchQRData(); }, [invitationId]);
 
-  // Update countdown timers
   useEffect(() => {
     if (!qrData) return;
-
     const interval = setInterval(() => {
-      const now = new Date().getTime();
-
-      // QR countdown
+      const now = Date.now();
       const qrExpiry = new Date(qrData.qrSession.expiresAt).getTime();
       const qrRemaining = Math.max(0, Math.floor((qrExpiry - now) / 1000));
       setQrTimeLeft(qrRemaining);
-
-      // OTP countdown
       if (qrData.otp) {
         const otpExpiry = new Date(qrData.otp.expiresAt).getTime();
-        const otpRemaining = Math.max(0, Math.floor((otpExpiry - now) / 1000));
-        setOtpTimeLeft(otpRemaining);
+        setOtpTimeLeft(Math.max(0, Math.floor((otpExpiry - now) / 1000)));
       }
-
-      // Auto-refresh when QR expires
-      if (qrRemaining === 0) {
-        fetchQRData();
-      }
+      if (qrRemaining === 0) fetchQRData();
     }, 1000);
-
     return () => clearInterval(interval);
   }, [qrData]);
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+  const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+
+  const progressPct = qrData ? (qrTimeLeft / qrData.qrExpirySeconds) * 100 : 100;
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-4">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto" />
+          <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto" />
           <p className="text-slate-600 mt-6 font-medium">Loading your access pass...</p>
         </div>
       </div>
@@ -115,17 +82,18 @@ export default function GuestQRPage() {
 
   if (error || !qrData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-rose-50 to-slate-100 p-4">
-        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full text-center">
-          <div className="w-20 h-20 bg-rose-100 rounded-full flex items-center justify-center mx-auto">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-rose-50 via-white to-slate-50 p-4">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-[2rem] shadow-2xl p-10 max-w-md w-full text-center border border-rose-100">
+          <div className="w-20 h-20 bg-rose-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <ICONS.Failure className="text-rose-600" size={40} />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mt-6">Access Denied</h1>
-          <p className="text-slate-600 mt-3">{error || 'Invalid invitation'}</p>
-          <p className="text-sm text-slate-400 mt-6">
-            If you believe this is an error, please contact your host.
+          <h1 className="text-2xl font-black text-slate-900 mb-3">Pass Unavailable</h1>
+          <p className="text-slate-500 font-medium">{error || 'This invitation is invalid or has expired.'}</p>
+          <p className="text-sm text-slate-400 mt-4 font-medium">
+            Contact your host if you believe this is an error.
           </p>
-        </div>
+        </motion.div>
       </div>
     );
   }
@@ -133,176 +101,171 @@ export default function GuestQRPage() {
   const securityLevel = `L${qrData.invitation.securityLevel}` as keyof typeof SECURITY_INFO;
   const securityInfo = SECURITY_INFO[securityLevel];
 
-  const displayImageUrl = qrData.organization?.imageUrl?.startsWith('http') 
-    ? qrData.organization.imageUrl 
+  const displayImageUrl = qrData.organization?.imageUrl?.startsWith('http')
+    ? qrData.organization.imageUrl
     : qrData.organization?.imageUrl ? `https://wowfy.in/testusr/images/${qrData.organization.imageUrl}` : null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-slate-100 p-4 flex items-center justify-center">
-      <div className="max-w-lg w-full space-y-6">
-        {/* Header */}
-        <div className="text-center space-y-3">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 p-4 pb-12">
+      <div className="max-w-md mx-auto space-y-5 pt-6">
+
+        {/* Org Header */}
+        <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }}
+          className="text-center space-y-3">
           {displayImageUrl ? (
-            <img src={displayImageUrl} alt="Organization Logo" className="h-20 w-20 shrink-0 object-cover border-4 border-white ring-1 ring-slate-200 rounded-2xl mx-auto shadow-xl" />
+            <img src={displayImageUrl} alt="Logo"
+              className="w-20 h-20 rounded-2xl object-cover border-4 border-white shadow-xl mx-auto" />
           ) : (
-            <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-blue-200">
-              <span className="text-3xl font-black text-white">{qrData.organization?.name?.[0]?.toUpperCase() || 'O'}</span>
+            <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-indigo-200">
+              <span className="text-3xl font-black text-white">
+                {qrData.organization?.name?.[0]?.toUpperCase() || 'O'}
+              </span>
             </div>
           )}
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight px-4">
-              {qrData.organization?.name || 'Organization'}
-            </h1>
-            <p className="text-slate-500 mt-1 font-bold uppercase tracking-widest text-[10px]">
-              {qrData.organization?.type || 'Visitor Pass'}
+            <h1 className="text-2xl font-black text-slate-900">{qrData.organization?.name}</h1>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+              {qrData.organization?.type}
             </p>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Main Card */}
-        <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200 border border-slate-100 overflow-hidden">
-          {/* Security Level Banner */}
-          <div className={`p-4 text-center ${securityInfo.color.replace('text', 'bg').replace('600', '50')} border-b border-slate-100`}>
-            <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold ${securityInfo.color}`}>
-              <ICONS.ShieldCheck size={16} />
-              Security Level L{qrData.invitation.securityLevel}
-            </span>
-            <p className="text-xs text-slate-600 mt-2">{securityInfo.description}</p>
-          </div>
+        {/* Security Level Banner */}
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}
+          className={`flex items-center justify-center gap-2 py-3 rounded-2xl ${securityInfo?.color ?? "bg-slate-100 text-slate-600"}`}>
+          <ICONS.ShieldCheck size={18} />
+          <span className="text-sm font-black">Security Level L{qrData.invitation.securityLevel}</span>
+          <span className="text-xs font-medium opacity-70">· {securityInfo?.description}</span>
+        </motion.div>
 
-          {/* QR Code Section */}
+        {/* QR Card */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+          className="bg-white rounded-[2rem] shadow-2xl shadow-slate-200 border border-slate-100 overflow-hidden">
           <div className="p-8">
-            <div className="relative bg-gradient-to-br from-slate-50 to-white p-8 rounded-3xl border-2 border-slate-100 shadow-inner">
-              <div className="aspect-square w-full max-w-sm mx-auto bg-white rounded-2xl p-6 shadow-lg">
+            <div className="bg-gradient-to-br from-slate-50 to-white rounded-[1.5rem] border border-slate-100 p-6 shadow-inner">
+              <div className="aspect-square w-full max-w-[260px] mx-auto bg-white rounded-2xl p-4 shadow-md">
                 <img
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(
-                    JSON.stringify({
-                      invitationId: invitationId,
-                      qrCode: qrData.qrSession.qrCode
-                    })
+                    JSON.stringify({ invitationId, qrCode: qrData.qrSession.qrCode })
                   )}`}
-                  alt="Access QR Code"
-                  className="w-full h-full object-contain"
-                />
-              </div>
-
-            {/* QR Countdown */}
-              <div className="mt-6 text-center">
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-md border border-slate-200">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  <span className="text-sm font-bold text-slate-700">
-                    Refreshes in: {formatTime(qrTimeLeft)}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 mt-3">
-                  QR code rotates every {qrData.qrExpirySeconds / 60} minutes for security
-                </p>
+                  alt="Access QR Code" className="w-full h-full object-contain" />
               </div>
             </div>
 
-            {/* Guest & Host Info */}
-            <div className="mt-6 p-4 bg-slate-50 rounded-2xl border border-slate-200 grid grid-cols-2 gap-4 text-left shadow-sm">
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Guest</p>
-                <p className="font-bold text-slate-900 truncate">{qrData.invitation.guestName || 'Visitor'}</p>
+            {/* Countdown */}
+            <div className="mt-5 space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-500">
+                <span>QR refreshes in</span>
+                <span className={`font-black text-base ${qrTimeLeft < 60 ? "text-rose-500" : "text-slate-800"}`}>
+                  {formatTime(qrTimeLeft)}
+                </span>
               </div>
-              <div className="text-right">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Host</p>
-                <p className="font-bold text-slate-900 truncate">{qrData.invitation.employeeName || 'Employee'}</p>
-              </div>
-            </div>
-
-            {/* OTP Section (L2/L4 only) */}
-            {qrData.otp && (
-              <div className="mt-6 p-6 bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl border-2 border-amber-200">
-                <div className="flex items-center justify-center gap-3 mb-4">
-                  <ICONS.Key className="text-amber-600" size={24} />
-                  <h2 className="text-lg font-bold text-amber-900">One-Time Password</h2>
-                </div>
-
-                <div className="bg-white rounded-2xl p-6 shadow-md text-center">
-                  <div className="text-5xl font-black text-amber-600 tracking-widest font-mono">
-                    {qrData.otp.otpCode}
-                  </div>
-                  <div className="mt-4 flex items-center justify-center gap-2">
-                    <ICONS.Clock className="text-amber-500" size={16} />
-                    <span className="text-sm font-semibold text-amber-700">
-                      Expires in: {formatTime(otpTimeLeft)}
-                    </span>
-                  </div>
-                </div>
-
-                <p className="text-xs text-amber-800 text-center mt-4">
-                  Present this code when requested by security
-                </p>
-              </div>
-            )}
-
-            {/* Validity Period */}
-            <div className="mt-6 p-4 bg-slate-50 rounded-2xl border border-slate-200">
-              <div className="flex items-center justify-between text-sm">
-                <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Valid From
-                  </p>
-                  <p className="font-semibold text-slate-900">
-                    {new Date(qrData.invitation.validFrom).toLocaleString()}
-                  </p>
-                </div>
-                <ICONS.ArrowRight className="text-slate-300" size={20} />
-                <div className="text-right">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    Valid Until
-                  </p>
-                  <p className="font-semibold text-slate-900">
-                    {new Date(qrData.invitation.validTo).toLocaleString()}
-                  </p>
-                </div>
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                <motion.div
+                  animate={{ width: `${progressPct}%` }}
+                  transition={{ duration: 1, ease: "linear" }}
+                  className={`h-full rounded-full ${qrTimeLeft < 60 ? "bg-rose-500" : "bg-indigo-500"}`} />
               </div>
             </div>
           </div>
-        </div>
+
+          {/* Guest/Host Strip */}
+          <div className="border-t border-slate-100 grid grid-cols-2 divide-x divide-slate-100">
+            <div className="p-5">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Guest</p>
+              <p className="font-black text-slate-900 truncate">{qrData.invitation.guestName}</p>
+            </div>
+            <div className="p-5">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Host</p>
+              <p className="font-black text-slate-900 truncate">{qrData.invitation.employeeName}</p>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* OTP Section */}
+        <AnimatePresence>
+          {qrData.otp && (
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-[2rem] border border-amber-200 p-7 shadow-lg">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                  <ICONS.Key className="text-amber-700" size={20} />
+                </div>
+                <div>
+                  <p className="font-black text-amber-900">One-Time Password</p>
+                  <p className="text-xs text-amber-600 font-medium">Share when requested by security</p>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl p-6 text-center shadow-md border border-amber-100">
+                <div className="text-5xl font-black text-amber-600 tracking-[0.35em] font-mono">
+                  {qrData.otp.otpCode}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between mt-4 text-xs font-bold">
+                <span className="text-amber-700">Expires in</span>
+                <span className={`text-base font-black ${otpTimeLeft < 60 ? "text-rose-600" : "text-amber-700"}`}>
+                  {formatTime(otpTimeLeft)}
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-amber-100 rounded-full mt-2 overflow-hidden">
+                <motion.div
+                  animate={{ width: `${(otpTimeLeft / (qrData.otpExpirySeconds || 300)) * 100}%` }}
+                  transition={{ duration: 1, ease: "linear" }}
+                  className={`h-full rounded-full ${otpTimeLeft < 60 ? "bg-rose-500" : "bg-amber-500"}`} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Validity */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+          className="bg-white/80 backdrop-blur rounded-[1.5rem] p-5 border border-slate-100 shadow-md">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Valid From</p>
+              <p className="text-sm font-black text-slate-800">{new Date(qrData.invitation.validFrom).toLocaleString()}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Valid Until</p>
+              <p className="text-sm font-black text-slate-800">{new Date(qrData.invitation.validTo).toLocaleString()}</p>
+            </div>
+          </div>
+        </motion.div>
 
         {/* Instructions */}
-        <div className="bg-white/80 backdrop-blur rounded-2xl p-6 border border-slate-100">
-          <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-            <ICONS.Info size={16} className="text-blue-600" />
-            How to Use
-          </h3>
-          <ul className="space-y-2 text-sm text-slate-600">
-            <li className="flex items-start gap-2">
-              <span className="w-5 h-5 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
-                1
-              </span>
-              <span>Present this QR code to security personnel at the gate</span>
-            </li>
-            {qrData.otp && (
-              <li className="flex items-start gap-2">
-                <span className="w-5 h-5 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
-                  2
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
+          className="bg-white/70 backdrop-blur rounded-[1.5rem] p-6 border border-slate-100 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <ICONS.Info size={16} className="text-indigo-500" />
+            <p className="text-sm font-black text-slate-700">How to use this pass</p>
+          </div>
+          <ol className="space-y-3">
+            {[
+              "Present this QR code at the entrance gate",
+              ...(qrData.otp ? ["Provide the OTP code when asked by security"] : []),
+              "Wait for verification and entry approval",
+            ].map((step, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-black flex-shrink-0 mt-0.5">
+                  {i + 1}
                 </span>
-                <span>Provide the OTP code when requested</span>
+                <span className="text-sm text-slate-600 font-medium">{step}</span>
               </li>
-            )}
-            <li className="flex items-start gap-2">
-              <span className="w-5 h-5 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
-                {qrData.otp ? '3' : '2'}
-              </span>
-              <span>Wait for verification and entry approval</span>
-            </li>
-          </ul>
-        </div>
+            ))}
+          </ol>
+        </motion.div>
 
         {/* Footer */}
-        <div className="text-center mt-8 space-y-4">
-          <p className="text-[11px] text-slate-500 font-medium px-4">
-            Keep this page open for entry. Do not share this QR code or OTP.
+        <div className="text-center pt-4 pb-2">
+          <p className="text-[11px] text-slate-400 font-medium mb-3">
+            Keep this page open for entry. Do not share your QR or OTP.
           </p>
-          <div className="flex flex-col items-center justify-center gap-1.5 pt-6 pb-2">
-            <ICONS.ShieldCheck className="text-slate-300 w-5 h-5" />
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              Powered by Knockster
-            </p>
+          <div className="flex items-center justify-center gap-2">
+            <ICONS.ShieldCheck className="text-slate-300 w-4 h-4" />
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Powered by Knockster</p>
           </div>
         </div>
       </div>

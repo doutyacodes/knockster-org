@@ -12,6 +12,7 @@
     "bcryptjs": "^3.0.3",
     "drizzle-kit": "^0.31.8",
     "drizzle-orm": "^0.45.1",
+    "framer-motion": "^12.40.0",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.562.0",
     "luxon": "^3.7.2",

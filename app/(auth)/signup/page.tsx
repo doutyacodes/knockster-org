@@ -161,23 +161,29 @@ const SignupPage = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 bg-slate-50">
-      <div className="w-full max-w-2xl space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="min-h-screen w-full flex items-center justify-center p-4 bg-[#FDFDFE] relative overflow-hidden selection:bg-purple-200">
+      {/* Soft Animated Background Gradients */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[0%] -left-[10%] w-[60%] h-[60%] rounded-full bg-gradient-to-br from-purple-400/20 to-indigo-400/20 blur-[120px] animate-pulse" style={{ animationDuration: '8s' }} />
+        <div className="absolute -bottom-[20%] right-[0%] w-[50%] h-[70%] rounded-full bg-gradient-to-bl from-blue-400/20 to-cyan-300/20 blur-[120px] animate-pulse" style={{ animationDuration: '12s' }} />
+      </div>
+
+      <div className="w-full max-w-2xl space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 relative z-10 my-8">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto shadow-xl shadow-blue-200">
-            <ICONS.ShieldCheck className="text-white w-8 h-8" />
+          <div className="w-20 h-20 bg-gradient-to-tr from-purple-600 to-blue-500 rounded-3xl flex items-center justify-center mx-auto shadow-2xl shadow-indigo-200 ring-4 ring-white">
+            <ICONS.ShieldCheck className="text-white w-10 h-10" />
           </div>
           <div>
-            <h1 className="text-4xl font-black text-slate-900 tracking-tighter">
+            <h1 className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-indigo-900 to-purple-800 tracking-tighter">
               Knockster
             </h1>
-            <p className="text-slate-500 mt-2 font-semibold">
+            <p className="text-purple-600/80 mt-2 font-bold tracking-widest uppercase text-xs">
               Create your organization account
             </p>
           </div>
         </div>
 
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl shadow-slate-200 border border-slate-100">
+        <div className="bg-white/80 backdrop-blur-xl p-8 rounded-[2.5rem] shadow-2xl shadow-purple-900/5 border border-white">
           {error && (
             <div className="mb-6 bg-rose-50 border border-rose-100 text-rose-600 px-4 py-3 rounded-2xl text-xs font-bold flex items-center gap-2">
               <ICONS.Failure size={16} />
@@ -198,7 +204,7 @@ const SignupPage = () => {
                     value={orgName}
                     onChange={(e) => setOrgName(e.target.value)}
                     placeholder="Acme Corp"
-                    className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-sm font-medium"
+                    className="w-full px-4 py-4 bg-white/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-400 transition-all text-sm font-medium"
                   />
                 </div>
 
@@ -210,7 +216,7 @@ const SignupPage = () => {
                   <select
                     value={orgType}
                     onChange={(e) => setOrgType(e.target.value)}
-                    className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-sm font-medium"
+                    className="w-full px-4 py-4 bg-white/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-400 transition-all text-sm font-medium"
                   >
                     {ORG_TYPES.map((t) => (
                       <option key={t.value} value={t.value}>
@@ -230,7 +236,7 @@ const SignupPage = () => {
                     value={adminEmail}
                     onChange={(e) => setAdminEmail(e.target.value)}
                     placeholder="admin@example.com"
-                    className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-sm font-medium"
+                    className="w-full px-4 py-4 bg-white/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-400 transition-all text-sm font-medium"
                   />
                 </div>
 
@@ -244,7 +250,7 @@ const SignupPage = () => {
                     value={adminPassword}
                     onChange={(e) => setAdminPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all text-sm font-medium"
+                    className="w-full px-4 py-4 bg-white/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-400 transition-all text-sm font-medium"
                   />
                 </div>
               </div>
@@ -258,13 +264,13 @@ const SignupPage = () => {
                   type="file"
                   accept="image/*"
                   onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-100 transition-all text-sm font-medium file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  className="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-purple-100 transition-all text-sm font-medium file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
                 />
               </div>
 
               <button
                 onClick={handleNextStep}
-                className="w-full py-4 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-all shadow-xl shadow-blue-200 flex items-center justify-center gap-2"
+                className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-2xl hover:opacity-90 transition-all shadow-xl shadow-indigo-200 flex items-center justify-center gap-2"
               >
                 Choose Plan <ICONS.ArrowRight size={20} />
               </button>
@@ -285,16 +291,16 @@ const SignupPage = () => {
                   <div
                     key={plan.id}
                     onClick={() => setSelectedPlanId(plan.id)}
-                    className={`cursor-pointer border-2 rounded-2xl p-6 transition-all ${
+                    className={`cursor-pointer border-2 rounded-3xl p-6 transition-all ${
                       selectedPlanId === plan.id
-                        ? "border-blue-600 bg-blue-50 shadow-lg shadow-blue-100"
-                        : "border-slate-200 hover:border-blue-300"
+                        ? "border-purple-500 bg-purple-50 shadow-xl shadow-purple-100 ring-4 ring-purple-500/10"
+                        : "border-slate-100 hover:border-purple-200 bg-white/50"
                     }`}
                   >
                     <h3 className="font-bold text-lg text-slate-900">
                       {plan.name}
                     </h3>
-                    <p className="text-2xl font-black text-blue-600 mt-2">
+                    <p className="text-2xl font-black text-purple-600 mt-2">
                       ₹{plan.price}
                     </p>
                     <ul className="mt-4 space-y-2 text-sm text-slate-600 font-medium">
@@ -312,7 +318,7 @@ const SignupPage = () => {
               <button
                 onClick={handlePaymentAndSignup}
                 disabled={loading || !selectedPlanId}
-                className="w-full py-4 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-200 flex items-center justify-center gap-2 disabled:opacity-70"
+                className="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-2xl hover:opacity-90 transition-all shadow-xl shadow-indigo-200 flex items-center justify-center gap-2 disabled:opacity-70"
               >
                 {loading ? (
                   <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -326,7 +332,7 @@ const SignupPage = () => {
 
         <p className="text-xs text-slate-400 font-medium text-center">
           Already have an account?{" "}
-          <a href="/login" className="text-blue-500 underline">
+          <a href="/login" className="text-purple-600 font-bold hover:underline">
             Login here
           </a>
         </p>

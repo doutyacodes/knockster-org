@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import Sidebar from "@/components/Sidebar";
-import Topbar from "@/components/Topbar";
+import Navbar from "@/components/Navbar";
 
 import { api } from "@/lib/api-client";
 
@@ -24,7 +23,6 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
@@ -74,10 +72,7 @@ export default function DashboardLayout({
     checkAuth();
   }, [router]);
 
-  // Close sidebar on route change for mobile
-  useEffect(() => {
-    setSidebarOpen(false);
-  }, [pathname]);
+
 
   const handleLogout = () => {
     localStorage.removeItem("knockster_auth");
@@ -93,26 +88,19 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
-      <Sidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        onLogout={handleLogout}
-        organizationName={user?.organizationName}
-        organizationType={user?.organizationType}
-        canManageHierarchy={user?.canManageHierarchy}
-        imageUrl={user?.imageUrl}
-      />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Topbar
-          onMenuClick={() => setSidebarOpen(true)}
-          userEmail={user?.email}
-          role={user?.role} // Note: API returns 'orgadmin', we might want to capitalize it or map it
-        />
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          <div className="max-w-7xl mx-auto space-y-6">{children}</div>
-        </main>
+    <div className="min-h-screen bg-[#FDFDFE] relative overflow-x-hidden selection:bg-purple-200">
+      {/* Soft Animated Background Gradients inspired by CodBe */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] rounded-full bg-gradient-to-br from-purple-300/30 to-indigo-300/30 blur-[100px] animate-pulse" style={{ animationDuration: '8s' }} />
+        <div className="absolute top-[20%] -right-[10%] w-[40%] h-[60%] rounded-full bg-gradient-to-bl from-blue-300/30 to-cyan-200/30 blur-[120px] animate-pulse" style={{ animationDuration: '12s' }} />
+        <div className="absolute -bottom-[20%] left-[20%] w-[60%] h-[50%] rounded-full bg-gradient-to-tr from-pink-200/30 to-orange-200/20 blur-[100px] animate-pulse" style={{ animationDuration: '10s' }} />
       </div>
+
+      <Navbar user={user} onLogout={handleLogout} />
+      
+      <main className="relative z-10 pt-32 pb-16 px-4 md:px-8 max-w-7xl mx-auto min-h-screen flex flex-col">
+        {children}
+      </main>
     </div>
   );
 }

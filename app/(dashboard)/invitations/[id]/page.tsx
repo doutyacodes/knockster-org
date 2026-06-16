@@ -4,6 +4,7 @@ import { ICONS, SECURITY_INFO } from "@/constants";
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { SecurityLevel } from "@/types";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface ScanEvent {
   id: number;
@@ -41,36 +42,22 @@ export default function InvitationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [revoking, setRevoking] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    fetchInvitationDetail();
-  }, [id]);
+  useEffect(() => { fetchInvitationDetail(); }, [id]);
 
   const fetchInvitationDetail = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('knockster_token');
-
-      if (!token) {
-        router.push('/login');
-        return;
-      }
-
+      if (!token) { router.push('/login'); return; }
       const response = await fetch(`/api/invitations/${id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Authorization': `Bearer ${token}` },
       });
-
       const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to fetch invitation');
-      }
-
+      if (!response.ok || !data.success) throw new Error(data.error || 'Failed to fetch invitation');
       setInvitation(data.data);
     } catch (error: any) {
-      console.error('Error fetching invitation:', error);
       setError(error.message || 'Failed to load invitation');
     } finally {
       setLoading(false);
@@ -78,50 +65,45 @@ export default function InvitationDetailPage() {
   };
 
   const handleRevoke = async () => {
-    if (!confirm('Are you sure you want to revoke this invitation? This action cannot be undone.')) {
-      return;
-    }
-
+    if (!confirm('Are you sure you want to revoke this invitation? This action cannot be undone.')) return;
     try {
       setRevoking(true);
       const token = localStorage.getItem('knockster_token');
-
       const response = await fetch(`/api/invitations/${id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ status: 'REVOKED' }),
       });
-
       const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to revoke invitation');
-      }
-
-      // Refresh invitation data
+      if (!response.ok || !data.success) throw new Error(data.error || 'Failed to revoke invitation');
       await fetchInvitationDetail();
-      alert('Invitation revoked successfully');
     } catch (error: any) {
-      console.error('Error revoking invitation:', error);
       alert(error.message || 'Failed to revoke invitation');
     } finally {
       setRevoking(false);
     }
   };
 
+  const handleCopyLink = () => {
+    const url = `${window.location.origin}/guest/${id}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
   const handleResend = () => {
-    // TODO: Implement resend functionality with SMS/Email
     alert('Resend functionality will be available once SMS/Email integration is complete');
   };
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto p-12 text-center">
-        <div className="w-12 h-12 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin mx-auto" />
-        <p className="text-slate-500 mt-4">Loading invitation details...</p>
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="h-8 w-32 bg-white/40 rounded-2xl animate-pulse" />
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+          <div className="md:col-span-2 h-72 bg-white/40 rounded-[2rem] animate-pulse" />
+          <div className="md:col-span-3 h-72 bg-white/40 rounded-[2rem] animate-pulse" />
+        </div>
       </div>
     );
   }
@@ -129,179 +111,187 @@ export default function InvitationDetailPage() {
   if (error || !invitation) {
     return (
       <div className="max-w-4xl mx-auto space-y-6">
-        <button
-          onClick={() => router.back()}
-          className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm font-medium"
-        >
+        <button onClick={() => router.back()}
+          className="flex items-center gap-2 text-slate-500 hover:text-indigo-700 transition-colors text-sm font-bold">
           <ICONS.ArrowRight className="rotate-180" size={16} />
-          Back to list
+          Back to Invitations
         </button>
-        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-8 text-center">
-          <ICONS.Failure className="text-rose-600 mx-auto" size={48} />
-          <p className="text-rose-600 font-semibold mt-4">{error || 'Invitation not found'}</p>
+        <div className="bg-rose-50 border border-rose-200 rounded-[2rem] p-12 text-center">
+          <div className="w-16 h-16 bg-rose-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <ICONS.Failure className="text-rose-600" size={32} />
+          </div>
+          <p className="text-rose-700 font-bold">{error || 'Invitation not found'}</p>
         </div>
       </div>
     );
   }
 
+  const secKey = `L${invitation.securityLevel}` as SecurityLevel;
+  const secInfo = SECURITY_INFO[secKey];
+  const statusColors: Record<string, string> = {
+    ACTIVE: "bg-emerald-100 text-emerald-700",
+    UPCOMING: "bg-blue-100 text-blue-700",
+    REVOKED: "bg-rose-100 text-rose-700",
+    EXPIRED: "bg-slate-100 text-slate-500",
+  };
+  const statusDots: Record<string, string> = {
+    ACTIVE: "bg-emerald-500",
+    UPCOMING: "bg-blue-500",
+    REVOKED: "bg-rose-500",
+    EXPIRED: "bg-slate-400",
+  };
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <button
-        onClick={() => router.back()}
-        className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors text-sm font-medium"
-      >
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
+      className="max-w-4xl mx-auto space-y-6">
+
+      <button onClick={() => router.back()}
+        className="flex items-center gap-2 text-slate-500 hover:text-indigo-700 transition-colors text-sm font-bold">
         <ICONS.ArrowRight className="rotate-180" size={16} />
-        Back to list
+        Back to Invitations
       </button>
 
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-6 md:p-8 flex flex-col md:flex-row gap-8">
-          {/* QR and Status */}
-          <div className="w-full md:w-64 flex-shrink-0 flex flex-col items-center gap-6">
-            <div className="relative p-6 bg-slate-50 rounded-3xl border-2 border-slate-100 aspect-square w-full flex items-center justify-center">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+        {/* QR Panel */}
+        <div className="md:col-span-2 flex flex-col gap-5">
+          <div className="bg-white/70 backdrop-blur-xl rounded-[2rem] p-6 border border-white shadow-xl flex flex-col items-center gap-5">
+            <div className="flex items-center gap-2 self-stretch justify-between">
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${statusColors[invitation.status] ?? "bg-slate-100 text-slate-500"}`}>
+                <div className={`w-1.5 h-1.5 rounded-full ${statusDots[invitation.status] ?? "bg-slate-400"}`} />
+                {invitation.status}
+              </span>
+              <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest ${secInfo?.color ?? "bg-slate-100 text-slate-600"}`}>
+                {secKey}
+              </span>
+            </div>
+
+            <div className="w-full aspect-square bg-gradient-to-br from-slate-50 to-white rounded-2xl border border-slate-100 p-5 flex items-center justify-center shadow-inner relative overflow-hidden">
               <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${invitation.id}`}
-                alt="QR Code"
-                className="w-40 h-40 opacity-80"
-              />
-              <div className="absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[1px]">
-                <p className="text-xs font-bold text-slate-400 uppercase bg-white px-3 py-1.5 rounded-full shadow-sm">
-                  Rotating QR Code
-                </p>
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${invitation.id}`}
+                alt="QR Code" className="w-full h-full object-contain rounded-xl" />
+              <div className="absolute inset-0 flex items-end justify-center pb-3">
+                <span className="bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-black text-slate-400 uppercase tracking-widest shadow-sm">
+                  Rotating QR
+                </span>
               </div>
             </div>
-            <div className="w-full space-y-3">
-              <button
-                onClick={handleRevoke}
-                disabled={revoking || invitation.status === 'REVOKED'}
-                className="w-full py-3 px-4 bg-rose-50 text-rose-600 font-bold rounded-2xl hover:bg-rose-100 transition-all border border-rose-100 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {revoking ? 'Revoking...' : invitation.status === 'REVOKED' ? 'Already Revoked' : 'Revoke Access'}
-              </button>
-              <button
-                onClick={handleResend}
-                className="w-full py-3 px-4 bg-slate-50 text-slate-600 font-bold rounded-2xl hover:bg-slate-100 transition-all border border-slate-200"
-              >
-                Resend to Guest
-              </button>
+
+            <button onClick={handleCopyLink}
+              className={`w-full py-3 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-2 border ${
+                copied
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100"
+              }`}>
+              {copied ? <><ICONS.Success size={16} /> Link Copied!</> : <><ICONS.Link size={16} /> Copy Guest Link</>}
+            </button>
+          </div>
+
+          {/* Actions */}
+          <div className="space-y-3">
+            <button onClick={handleRevoke} disabled={revoking || invitation.status === 'REVOKED'}
+              className="w-full py-3.5 px-4 bg-rose-50 text-rose-600 font-bold rounded-2xl hover:bg-rose-100 transition-all border border-rose-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+              {revoking
+                ? <div className="w-4 h-4 border-2 border-rose-300 border-t-rose-600 rounded-full animate-spin" />
+                : <ICONS.Close size={16} />}
+              {invitation.status === 'REVOKED' ? 'Already Revoked' : 'Revoke Access'}
+            </button>
+            <button onClick={handleResend}
+              className="w-full py-3.5 px-4 bg-white/60 text-slate-600 font-bold rounded-2xl hover:bg-white transition-all border border-slate-200 flex items-center justify-center gap-2">
+              <ICONS.Phone size={16} />
+              Resend to Guest
+            </button>
+          </div>
+        </div>
+
+        {/* Details Panel */}
+        <div className="md:col-span-3 space-y-5">
+          {/* Guest Info */}
+          <div className="bg-white/70 backdrop-blur-xl rounded-[2rem] p-7 border border-white shadow-xl">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Guest</p>
+            <h1 className="text-3xl font-black text-slate-900 mb-1">{invitation.guestName}</h1>
+            <div className="flex items-center gap-2 text-slate-500">
+              <ICONS.Phone size={14} />
+              <span className="text-sm font-medium">{invitation.guestPhone}</span>
             </div>
           </div>
 
-          {/* Details */}
-          <div className="flex-1 space-y-8">
-            <div className="flex flex-wrap items-center justify-between gap-4">
+          {/* Host Info */}
+          <div className="bg-white/70 backdrop-blur-xl rounded-[2rem] p-7 border border-white shadow-xl">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Invited By</p>
+            <p className="text-xl font-black text-slate-900 mb-1">{invitation.employeeName}</p>
+            <div className="flex items-center gap-2 text-slate-500">
+              <ICONS.Phone size={14} />
+              <span className="text-sm font-medium">{invitation.employeePhone}</span>
+            </div>
+          </div>
+
+          {/* Validity */}
+          <div className="bg-white/70 backdrop-blur-xl rounded-[2rem] p-7 border border-white shadow-xl">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Validity Period</p>
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <h1 className="text-3xl font-bold text-slate-900">
-                  {invitation.guestName}
-                </h1>
-                <p className="text-slate-500 flex items-center gap-2 mt-1">
-                  <ICONS.Phone size={14} /> {invitation.guestPhone}
-                </p>
+                <p className="text-[10px] font-bold text-slate-400 mb-1">From</p>
+                <p className="font-black text-slate-900 text-sm">{new Date(invitation.validFrom).toLocaleString()}</p>
               </div>
-              <div className="flex flex-col items-end gap-2">
-                <span
-                  className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest ${
-                    SECURITY_INFO[`L${invitation.securityLevel}` as SecurityLevel].color
-                  }`}
-                >
-                  Security L{invitation.securityLevel}
-                </span>
-                <span
-                  className={`px-3 py-1 rounded-full text-[11px] font-semibold ${
-                    invitation.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600' :
-                    invitation.status === 'UPCOMING' ? 'bg-blue-50 text-blue-600' :
-                    invitation.status === 'REVOKED' ? 'bg-rose-50 text-rose-600' :
-                    'bg-slate-100 text-slate-500'
-                  }`}
-                >
-                  {invitation.status}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-              <div className="space-y-1.5">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  Validity Period
-                </p>
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <p className="text-sm font-bold text-slate-900">
-                    {new Date(invitation.validFrom).toLocaleString()}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    to {new Date(invitation.validTo).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  Invited By (Host)
-                </p>
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                  <p className="text-sm font-bold text-slate-900">
-                    {invitation.employeeName}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {invitation.employeePhone}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                Recent Activity
-              </p>
-              <div className="space-y-3">
-                {invitation.scanEvents.length === 0 ? (
-                  <div className="p-6 bg-slate-50/50 rounded-2xl border border-slate-100 text-center">
-                    <p className="text-slate-500 text-sm">No scan activity yet</p>
-                  </div>
-                ) : (
-                  invitation.scanEvents.map((log) => (
-                    <div
-                      key={log.id}
-                      className="flex items-center justify-between p-3 bg-slate-50/50 rounded-xl border border-slate-100"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                            log.scanResult === "SUCCESS"
-                              ? "bg-emerald-100 text-emerald-600"
-                              : "bg-rose-100 text-rose-600"
-                          }`}
-                        >
-                          {log.scanResult === "SUCCESS" ? (
-                            <ICONS.Success size={14} />
-                          ) : (
-                            <ICONS.Failure size={14} />
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">
-                            {log.scanResult === "SUCCESS" ? "Successful" : "Failed"} Scan
-                          </p>
-                          <p className="text-[10px] text-slate-500">
-                            {new Date(log.scannedAt).toLocaleString()}
-                          </p>
-                          {log.failureReason && (
-                            <p className="text-[10px] text-rose-600 mt-0.5">
-                              {log.failureReason}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <span className="text-xs font-medium text-slate-400">
-                        L{log.securityLevel}
-                      </span>
-                    </div>
-                  ))
-                )}
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 mb-1">Until</p>
+                <p className="font-black text-slate-900 text-sm">{new Date(invitation.validTo).toLocaleString()}</p>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Scan Timeline */}
+      <div className="bg-white/70 backdrop-blur-xl rounded-[2rem] border border-white shadow-xl overflow-hidden">
+        <div className="p-7 border-b border-slate-100/60">
+          <h3 className="font-black text-slate-900 text-lg">Scan Activity</h3>
+          <p className="text-xs text-slate-400 font-medium mt-0.5">{invitation.scanEvents.length} event{invitation.scanEvents.length !== 1 ? "s" : ""} recorded</p>
+        </div>
+
+        <div className="p-7">
+          {invitation.scanEvents.length === 0 ? (
+            <div className="py-12 text-center">
+              <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <ICONS.Logs className="text-slate-300 w-8 h-8" />
+              </div>
+              <p className="text-slate-500 font-medium">No scan activity yet</p>
+              <p className="text-xs text-slate-400 mt-1">Scans will appear here once the guest uses their pass</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <AnimatePresence>
+                {invitation.scanEvents.map((log, i) => (
+                  <motion.div key={log.id}
+                    initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="flex items-center gap-4 p-4 rounded-2xl hover:bg-slate-50/80 transition-colors">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      log.scanResult === "SUCCESS" ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
+                    }`}>
+                      {log.scanResult === "SUCCESS" ? <ICONS.Success size={18} /> : <ICONS.Failure size={18} />}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-black text-slate-900">
+                        {log.scanResult === "SUCCESS" ? "Access Granted" : "Access Denied"}
+                      </p>
+                      <p className="text-xs text-slate-400 font-medium mt-0.5">
+                        {new Date(log.scannedAt).toLocaleString()}
+                      </p>
+                      {log.failureReason && (
+                        <p className="text-xs text-rose-600 font-medium mt-1">{log.failureReason}</p>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2.5 py-1 rounded-lg">
+                      L{log.securityLevel}
+                    </span>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
+        </div>
+      </div>
+    </motion.div>
   );
 }
