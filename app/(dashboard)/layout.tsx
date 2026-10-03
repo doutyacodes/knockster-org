@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 import { api } from "@/lib/api-client";
 
@@ -32,8 +33,8 @@ export default function DashboardLayout({
   // Check authentication and fetch user data on mount
   useEffect(() => {
     const checkAuth = async () => {
-      const authStatus = localStorage.getItem("knockster_auth") === "true";
-      const token = localStorage.getItem("knockster_token");
+      const authStatus = localStorage.getItem("zuppgate_auth") === "true";
+      const token = localStorage.getItem("zuppgate_token");
 
       if (!authStatus) {
         setIsAuthenticated(false);
@@ -50,8 +51,8 @@ export default function DashboardLayout({
           setIsAuthenticated(true);
         } else {
           // Token might be invalid
-          localStorage.removeItem("knockster_auth");
-          localStorage.removeItem("knockster_token");
+          localStorage.removeItem("zuppgate_auth");
+          localStorage.removeItem("zuppgate_token");
           setIsAuthenticated(false);
           router.push("/login");
         }
@@ -61,7 +62,7 @@ export default function DashboardLayout({
         // OR redirect to login if we want strict security.
         // For now, let's keep them logged in but without data if API fails,
         // or maybe strict logout? Let's assume strict.
-        localStorage.removeItem("knockster_auth");
+        localStorage.removeItem("zuppgate_auth");
         setIsAuthenticated(false);
         router.push("/login");
       } finally {
@@ -75,8 +76,8 @@ export default function DashboardLayout({
 
 
   const handleLogout = () => {
-    localStorage.removeItem("knockster_auth");
-    localStorage.removeItem("knockster_token");
+    localStorage.removeItem("zuppgate_auth");
+    localStorage.removeItem("zuppgate_token");
     setUser(null);
     setIsAuthenticated(false);
     router.push("/login");
@@ -88,7 +89,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-[#FDFDFE] relative overflow-x-hidden selection:bg-purple-200">
+    <div className="min-h-screen flex flex-col bg-[#FDFDFE] relative overflow-x-hidden selection:bg-purple-200">
       {/* Soft Animated Background Gradients inspired by CodBe */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] rounded-full bg-gradient-to-br from-purple-300/30 to-indigo-300/30 blur-[100px] animate-pulse" style={{ animationDuration: '8s' }} />
@@ -98,9 +99,11 @@ export default function DashboardLayout({
 
       <Navbar user={user} onLogout={handleLogout} />
       
-      <main className="relative z-10 pt-32 pb-16 px-4 md:px-8 max-w-7xl mx-auto min-h-screen flex flex-col">
+      <main className="relative z-10 pt-32 pb-16 px-4 md:px-8 max-w-7xl mx-auto w-full flex-1 flex flex-col">
         {children}
       </main>
+
+      <Footer />
     </div>
   );
 }

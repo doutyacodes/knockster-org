@@ -49,7 +49,7 @@ export default function InvitationDetailPage() {
   const fetchInvitationDetail = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('knockster_token');
+      const token = localStorage.getItem('zuppgate_token');
       if (!token) { router.push('/login'); return; }
       const response = await fetch(`/api/invitations/${id}`, {
         headers: { 'Authorization': `Bearer ${token}` },
@@ -68,7 +68,7 @@ export default function InvitationDetailPage() {
     if (!confirm('Are you sure you want to revoke this invitation? This action cannot be undone.')) return;
     try {
       setRevoking(true);
-      const token = localStorage.getItem('knockster_token');
+      const token = localStorage.getItem('zuppgate_token');
       const response = await fetch(`/api/invitations/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },

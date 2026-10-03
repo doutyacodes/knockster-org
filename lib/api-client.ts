@@ -2,7 +2,7 @@ export async function apiRequest<T = any>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = localStorage.getItem('knockster_token');
+  const token = localStorage.getItem('zuppgate_token');
 
   const config: RequestInit = {
     ...options,

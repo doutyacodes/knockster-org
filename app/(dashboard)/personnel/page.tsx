@@ -45,7 +45,7 @@ export default function PersonnelPage() {
   const fetchPersonnel = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('knockster_token');
+      const token = localStorage.getItem('zuppgate_token');
 
       if (!token) {
         router.push('/login');
@@ -87,7 +87,7 @@ export default function PersonnelPage() {
     setIsSaving(true);
 
     try {
-      const token = localStorage.getItem('knockster_token');
+      const token = localStorage.getItem('zuppgate_token');
 
       const response = await fetch('/api/personnel', {
         method: 'POST',
@@ -140,7 +140,7 @@ export default function PersonnelPage() {
     setError('');
 
     try {
-      const token = localStorage.getItem('knockster_token');
+      const token = localStorage.getItem('zuppgate_token');
 
       const updateData: any = {
         username: editFormData.username,

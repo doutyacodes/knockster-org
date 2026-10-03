@@ -1,8 +1,8 @@
-# Knockster Security - Mobile App Development Specification
+# Zuppgate Security - Mobile App Development Specification
 
 ## 📱 Project Overview
 
-Build a **modern, futuristic security guard mobile application** for the Knockster platform using **Expo React Native**. This app enables security personnel to authenticate guest invitations through QR code scanning, OTP verification, and real-time access validation across multiple security levels (L1-L4).
+Build a **modern, futuristic security guard mobile application** for the Zuppgate platform using **Expo React Native**. This app enables security personnel to authenticate guest invitations through QR code scanning, OTP verification, and real-time access validation across multiple security levels (L1-L4).
 
 ---
 
@@ -90,7 +90,7 @@ Build a **modern, futuristic security guard mobile application** for the Knockst
 ## 📱 Screen Specifications
 
 ### **1. Splash Screen**
-- Knockster logo with animated glow
+- Zuppgate logo with animated glow
 - Loading indicator
 - Auto-navigate to Login or Dashboard (if authenticated)
 
@@ -490,7 +490,7 @@ interface AppState {
 ## 📦 Project Structure
 
 ```
-knockster-security/
+zuppgate-security/
 ├── app/                        # Expo Router pages
 │   ├── (auth)/
 │   │   ├── login.tsx

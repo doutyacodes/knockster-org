@@ -47,7 +47,7 @@ export default function PersonnelDetailPage() {
   const fetchPersonnelDetail = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('knockster_token');
+      const token = localStorage.getItem('zuppgate_token');
       if (!token) { router.push('/login'); return; }
       const response = await fetch(`/api/personnel/${id}`, {
         headers: { 'Authorization': `Bearer ${token}` },

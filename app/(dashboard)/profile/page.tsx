@@ -30,7 +30,7 @@ const Profile: React.FC = () => {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('knockster_token');
+      const token = localStorage.getItem('zuppgate_token');
       if (!token) { router.push('/login'); return; }
 
       const response = await fetch('/api/profile', {
@@ -58,7 +58,7 @@ const Profile: React.FC = () => {
     setIsSaving(true);
     setError('');
     try {
-      const token = localStorage.getItem('knockster_token');
+      const token = localStorage.getItem('zuppgate_token');
       const response = await fetch('/api/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -80,9 +80,9 @@ const Profile: React.FC = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('knockster_token');
-    localStorage.removeItem('knockster_user');
-    localStorage.removeItem('knockster_auth');
+    localStorage.removeItem('zuppgate_token');
+    localStorage.removeItem('zuppgate_user');
+    localStorage.removeItem('zuppgate_auth');
     router.push('/login');
   };
 

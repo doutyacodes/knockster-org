@@ -41,9 +41,9 @@ const LoginPage = () => {
       }
 
       // Store token and user data
-      localStorage.setItem("knockster_token", data.data.token);
-      localStorage.setItem("knockster_user", JSON.stringify(data.data.user));
-      localStorage.setItem("knockster_auth", "true"); // For backward compatibility
+      localStorage.setItem("zuppgate_token", data.data.token);
+      localStorage.setItem("zuppgate_user", JSON.stringify(data.data.user));
+      localStorage.setItem("zuppgate_auth", "true"); // For backward compatibility
 
       // Redirect to dashboard
       router.replace("/invitations");
@@ -55,7 +55,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 bg-[#FDFDFE] relative overflow-hidden selection:bg-purple-200">
+    <div className="flex-1 w-full flex items-center justify-center p-4 bg-[#FDFDFE] relative overflow-hidden selection:bg-purple-200">
       {/* Soft Animated Background Gradients */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[0%] -left-[10%] w-[60%] h-[60%] rounded-full bg-gradient-to-br from-purple-400/20 to-indigo-400/20 blur-[120px] animate-pulse" style={{ animationDuration: '8s' }} />
@@ -71,7 +71,7 @@ const LoginPage = () => {
           </div>
           <div>
             <h1 className="text-4xl font-black bg-clip-text text-transparent bg-gradient-to-r from-indigo-900 to-purple-800 tracking-tighter">
-              Knockster
+              Zuppgate
             </h1>
             <p className="text-purple-600/80 mt-2 font-bold tracking-widest uppercase text-xs">
               Welcome Back
@@ -98,7 +98,7 @@ const LoginPage = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@knockster.io"
+                placeholder="admin@zuppgate.io"
                 className="w-full px-4 py-4 bg-white/50 border border-slate-200 rounded-2xl
                   focus:outline-none focus:ring-4 focus:ring-purple-100 focus:border-purple-400
                   transition-all text-sm font-medium"

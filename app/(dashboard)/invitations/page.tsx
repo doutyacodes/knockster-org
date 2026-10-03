@@ -42,7 +42,7 @@ const Invitations: React.FC = () => {
   const fetchInvitations = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem("knockster_token");
+      const token = localStorage.getItem("zuppgate_token");
 
       if (!token) {
         router.push("/login");
@@ -70,7 +70,7 @@ const Invitations: React.FC = () => {
 
   const fetchVisitorTypes = async () => {
     try {
-      const token = localStorage.getItem("knockster_token");
+      const token = localStorage.getItem("zuppgate_token");
       const response = await fetch("/api/visitor-types", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -108,7 +108,7 @@ const Invitations: React.FC = () => {
     setCreating(true);
 
     try {
-      const token = localStorage.getItem("knockster_token");
+      const token = localStorage.getItem("zuppgate_token");
 
       const response = await fetch("/api/invitations", {
         method: "POST",

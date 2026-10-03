@@ -265,7 +265,7 @@ export default function GuestQRPage() {
           </p>
           <div className="flex items-center justify-center gap-2">
             <ICONS.ShieldCheck className="text-slate-300 w-4 h-4" />
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Powered by Knockster</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Powered by Zuppgate</p>
           </div>
         </div>
       </div>
