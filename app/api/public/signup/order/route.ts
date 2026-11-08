@@ -25,10 +25,18 @@ export async function POST(req: NextRequest) {
       return errorResponse('Plan not found', 404);
     }
 
-    // Initialize Razorpay
+    // Credentials come from the environment. They were previously hardcoded
+    // here and in signup/verify, which committed a live key secret to git
+    // history — rotate the key pair in the Razorpay dashboard, because the old
+    // secret must be treated as compromised regardless of this change.
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      console.error('Razorpay credentials are not configured');
+      return errorResponse('Payments are not configured', 500);
+    }
+
     const razorpay = new Razorpay({
-      key_id: 'rzp_test_T0iBBSGAyaK3r3',
-      key_secret: '3X3n9Xir5R4t52z5yZalRYvM',
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
     const amountInPaise = Math.round(Number(plan.price) * 100);

@@ -1,3 +1,39 @@
+# Zuppgate — organisation dashboard & mobile API
+
+> ## This database is shared with Zuppdate
+>
+> Zuppgate and Zuppdate (a separate product, separate repo) run on **one
+> database**. Customer identity is shared: a visitor's `guest` row points at a
+> Zuppdate `users` row via `guest.user_id`, so one login covers both products.
+>
+> **The schema is owned by Zuppdate's `prisma/schema.prisma`, not by this repo.**
+> `db/schema.ts` here is a query contract only. Four rules follow from that:
+>
+> 1. **Never run `drizzle-kit push` or `drizzle-kit generate`.** `db/schema.ts`
+>    knows 21 of the database's 79 tables and declares 8 of this product's 25
+>    real foreign keys, so a push offers to drop Zuppdate entirely and silently
+>    deletes 17 constraints. See the comment in `drizzle.config.ts`.
+>    `drizzle-kit studio` is read-only and safe.
+> 2. To change this product's schema, edit the `ZUPPGATE` section of Zuppdate's
+>    `prisma/schema.prisma`, run `prisma migrate dev` there, then mirror the
+>    change in `db/schema.ts`.
+> 3. The broadcast-notification table is **`app_notifications`**, not
+>    `notifications` — that name collided with Zuppdate's social feed. The
+>    exported Drizzle identifier is still `notifications`, so queries are
+>    unchanged. See the comment in `db/schema.ts`.
+> 4. `db/index.ts` pins every connection to `SET time_zone = '+00:00'`. Every
+>    table here uses MySQL `TIMESTAMP`, which converts on read, so without this
+>    a developer machine in a non-UTC zone reads every timestamp hours off and
+>    invitations expire at the wrong moment. Do not remove it.
+>
+> Mobile API responses are **additive only** — the guest and security Expo apps
+> live outside this repo and are built against the existing shapes. Never
+> rename, retype or remove a key; in particular `guest.id` must stay Zuppgate's
+> uuid and never become `users.id`.
+>
+> Full write-up, including production import and deployment: **`SHARED-DATABASE.md`
+> in the zuppdate repo**.
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started

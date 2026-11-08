@@ -97,7 +97,11 @@ const SignupPage = () => {
       if (!orderData.success) throw new Error(orderData.error);
 
       const options = {
-        key: "rzp_test_T0iBBSGAyaK3r3", // Test Key
+        // The publishable key id, from the environment rather than hardcoded.
+        // NEXT_PUBLIC_* is correct here: the key id is designed to be visible
+        // in the browser. Only the key SECRET is confidential, and that stays
+        // server-side in the order/verify routes.
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         amount: orderData.data.amount,
         currency: orderData.data.currency,
         name: "Zuppgate",

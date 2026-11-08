@@ -6,6 +6,7 @@ import { authenticateRequest } from '@/lib/auth';
 import { successResponse, errorResponse, unauthorizedResponse } from '@/lib/api-response';
 import { toIST, fromIST } from '@/lib/timezone';
 import { checkCanCreateInvitation } from '@/lib/subscription';
+import { linkGuestToUser } from '@/lib/account-link';
 import { visitorType } from '@/db/schema';
 
 // Map database status to frontend status
@@ -200,6 +201,12 @@ export async function POST(req: NextRequest) {
 
       guestId = newGuest.id;
     }
+
+    // The person being invited may already be a Zuppdate customer — link the
+    // visitor profile to that account so their visit history shows up under the
+    // one login. Link-only and non-fatal: an unmatched phone just stays
+    // unlinked, and a failure here must not block the invitation being issued.
+    await linkGuestToUser(guestId, guestPhone);
 
     // Determine status based on dates
     const now = new Date();

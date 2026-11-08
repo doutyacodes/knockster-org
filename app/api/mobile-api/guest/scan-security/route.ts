@@ -8,7 +8,7 @@ import {
   invitationScanEvent,
   guestOtp,
 } from '@/db/schema';
-import { authenticateRequest } from '@/lib/auth';
+import { authenticateRequest, JWT_SECRET } from '@/lib/auth';
 import { successResponse, errorResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
 import crypto from 'crypto';
 
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     // Verify signature
     const expectedSignature = crypto
       .createHash('sha256')
-      .update(`${guardId}-${guardOrgId}-${process.env.JWT_SECRET}`)
+      .update(`${guardId}-${guardOrgId}-${JWT_SECRET}`)
       .digest('hex');
 
     if (signature !== expectedSignature) {

@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { guest, guestDevice, notificationTokens } from '@/db/schema';
 import { generateToken } from '@/lib/auth';
 import { successResponse, errorResponse } from '@/lib/api-response';
+import { linkGuestToUser, zuppdateAccountPayload } from '@/lib/account-link';
 import crypto from 'crypto';
 
 // POST /api/mobile-api/guest/login - Guest login with phone number (OTP-less for now)
@@ -132,6 +133,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Attach this visitor to their Zuppdate customer account if one exists, so
+    // one login covers both products. Link-only: never creates a Zuppdate user.
+    // The returned token stays a `guest` token — this link carries data, not
+    // authority. See lib/account-link.ts for why that separation is load-bearing.
+    const linkedUser = await linkGuestToUser(guestUser.id, guestUser.phone);
+
     // Generate JWT token
     const token = generateToken({
       id: guestUser.id,
@@ -145,6 +152,9 @@ export async function POST(req: NextRequest) {
         id: guestUser.id,
         name: guestUser.name,
         phone: guestUser.phone,
+        // Additive only — existing keys above are untouched so the Expo guest
+        // app keeps working with no release.
+        ...zuppdateAccountPayload(linkedUser),
       },
     }, 'Login successful');
 

@@ -25,14 +25,24 @@ export async function POST(req: NextRequest) {
       return errorResponse('All fields are required', 400);
     }
 
-    // Verify signature
-    const secret = '3X3n9Xir5R4t52z5yZalRYvM';
+    // Verify signature. The key secret comes from the environment — it used to
+    // be hardcoded here, so the old value is in git history and must be rotated.
+    const secret = process.env.RAZORPAY_KEY_SECRET;
+    if (!secret) {
+      console.error('RAZORPAY_KEY_SECRET is not configured');
+      return errorResponse('Payments are not configured', 500);
+    }
+
     const generatedSignature = crypto
       .createHmac('sha256', secret)
       .update(`${razorpayOrderId}|${razorpayPaymentId}`)
       .digest('hex');
 
-    if (generatedSignature !== razorpaySignature) {
+    // timingSafeEqual over the hex digests: both are the same fixed length, so
+    // comparing them this way avoids leaking information through compare time.
+    const expected = Buffer.from(generatedSignature, 'utf8');
+    const received = Buffer.from(String(razorpaySignature), 'utf8');
+    if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) {
       return errorResponse('Payment signature verification failed', 400);
     }
 

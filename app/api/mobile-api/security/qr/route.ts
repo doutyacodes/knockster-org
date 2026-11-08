@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db } from '@/db';
 import { securityPersonnel, organizationNode } from '@/db/schema';
-import { authenticateRequest } from '@/lib/auth';
+import { authenticateRequest, JWT_SECRET } from '@/lib/auth';
 import { successResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
 import crypto from 'crypto';
 
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
       // Add signature to prevent tampering
       signature: crypto
         .createHash('sha256')
-        .update(`${guard.id}-${guard.organizationNodeId}-${process.env.JWT_SECRET}`)
+        .update(`${guard.id}-${guard.organizationNodeId}-${JWT_SECRET}`)
         .digest('hex'),
     };
 

@@ -97,10 +97,26 @@ export const guardDevice = mysqlTable('guard_device', {
 });
 
 // 8. Guest
+//
+// SHARED DATABASE NOTE: this table now lives in the `zups` database alongside
+// Zuppdate. `userId` is the single-login link — it points at the Zuppdate
+// `users` row that is the same human, so one customer account covers both
+// products. See lib/account-link.ts for how it gets set.
+//
+// `id` stays a uuid and stays the PK: guest_invitation, guest_device,
+// notification_tokens and notification_reads all reference it, and the Expo
+// guest app caches it. It must never be repointed at users.id.
+//
+// The DDL for this table is owned by Zuppdate's prisma/schema.prisma
+// (model ZgGuest). Keep the two in lockstep; do not run drizzle-kit push.
 export const guest = mysqlTable('guest', {
   id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   phone: varchar('phone', { length: 20 }).notNull().unique(),
   name: varchar('name', { length: 255 }),
+  // NULL until this visitor is known to have a Zuppdate account. Length 191
+  // (not 36) because Zuppdate's users.id is a cuid in a VARCHAR(191) column —
+  // a foreign key requires both sides to match exactly.
+  userId: varchar('user_id', { length: 191 }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -195,7 +211,18 @@ export const notificationTokens = mysqlTable('notification_tokens', {
 });
 
 // 16. Notifications (Broadcast to all guests or all security)
-export const notifications = mysqlTable('notifications', {
+//
+// SHARED DATABASE NOTE: the underlying table is `app_notifications`, NOT
+// `notifications`. Zuppdate has its own `notifications` table (the social
+// follow feed — entirely different columns) and the two collided when both
+// products moved into the `zups` database. Zuppgate's was the one renamed
+// because no mobile API response exposes a table name, so both Expo apps are
+// unaffected, whereas renaming Zuppdate's would mean migrating its larger
+// production dataset.
+//
+// The exported identifier stays `notifications` on purpose: every query in
+// this codebase keeps working unchanged.
+export const notifications = mysqlTable('app_notifications', {
   id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
   title: varchar('title', { length: 255 }).notNull(),
   body: text('body').notNull(),
@@ -311,6 +338,9 @@ export const guestRelations = relations(guest, ({ many }) => ({
   devices: many(guestDevice),
   notificationTokens: many(notificationTokens),
   notificationReads: many(notificationReads),
+  // No `one(users)` relation here: Zuppdate's `users` table is not declared in
+  // this Drizzle schema (Prisma owns it), so the link is read via an explicit
+  // join on guest.userId where needed. See lib/account-link.ts.
 }));
 
 export const guestDeviceRelations = relations(guestDevice, ({ one }) => ({

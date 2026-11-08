@@ -1,7 +1,22 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key';
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} environment variable is not set`);
+  }
+  return value;
+}
+
+// Fail fast rather than falling back to a hardcoded default.
+//
+// This secret does double duty: it signs every session token AND it is the key
+// in the guard QR signature (sha256(guardId-orgId-JWT_SECRET), see
+// app/api/mobile-api/security/qr). With a known fallback value, anyone could
+// mint a valid guard QR and clear an L3/L4 gate, and forge session tokens for
+// any role. A deployment missing this variable must not start.
+export const JWT_SECRET = requireEnv("JWT_SECRET");
 
 export interface JWTPayload {
   id: string;

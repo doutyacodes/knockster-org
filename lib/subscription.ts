@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm';
+import { eq, and, gte, lt, count } from 'drizzle-orm';
 import { db } from '@/db';
 import { organizationPlan, subscriptionPlan, securityPersonnel, guestInvitation } from '@/db/schema';
 
@@ -32,12 +32,14 @@ export async function checkCanCreateGuard(organizationNodeId: string) {
   const plan = await getOrganizationActivePlan(organizationNodeId);
   if (!plan) return { allowed: false, error: 'No active subscription plan found.' };
 
-  const personnel = await db
-    .select({ id: securityPersonnel.id })
+  // COUNT(*) rather than fetching every row just to call .length on it —
+  // guard headcount is a ceiling check, the rows themselves are never used.
+  const [{ used }] = await db
+    .select({ used: count() })
     .from(securityPersonnel)
     .where(eq(securityPersonnel.organizationNodeId, organizationNodeId));
 
-  if (personnel.length >= plan.maxGuards) {
+  if (used >= plan.maxGuards) {
     return { allowed: false, error: `Maximum guards limit (${plan.maxGuards}) reached for your plan.` };
   }
 
@@ -54,21 +56,38 @@ export async function checkCanCreateInvitation(organizationNodeId: string, secur
   if (securityLevel === 3 && !plan.allowL3) return { allowed: false, error: 'Your plan does not allow L3 security level.' };
   if (securityLevel === 4 && !plan.allowL4) return { allowed: false, error: 'Your plan does not allow L4 security level.' };
 
-  // Check limits
-  const date = new Date();
-  const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-  const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  // `maxGuestPasses` is a per-month allowance, so count only this calendar
+  // month's invitations.
+  //
+  // This previously counted every invitation the organisation had EVER created,
+  // against the same ceiling. The effect was a slow-acting lockout: an org on a
+  // 100-pass plan could issue 100 invitations in total and then never issue
+  // another one, with the error message still claiming they had hit a limit
+  // they were in fact renewing every month. The old code even said as much in a
+  // comment. Counting per month is what the plan actually sells.
+  //
+  // Month boundaries are built in UTC to match how `created_at` is stored
+  // (lib/timezone.ts keeps the database in UTC and converts for display only).
+  const now = new Date();
+  const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const startOfNextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
 
-  // In a real app, you might want to filter by the current billing cycle. 
-  // We'll just do a basic count for now or assume passes are monthly.
-  const passes = await db
-    .select({ id: guestInvitation.id })
+  const [{ used }] = await db
+    .select({ used: count() })
     .from(guestInvitation)
-    .where(eq(guestInvitation.organizationNodeId, organizationNodeId));
+    .where(
+      and(
+        eq(guestInvitation.organizationNodeId, organizationNodeId),
+        gte(guestInvitation.createdAt, startOfMonth),
+        lt(guestInvitation.createdAt, startOfNextMonth)
+      )
+    );
 
-  // If you want strictly monthly, add a date filter above. For now, total passes vs maxGuestPasses
-  if (passes.length >= plan.maxGuestPasses) {
-    return { allowed: false, error: `Maximum guest passes limit (${plan.maxGuestPasses}) reached for your plan.` };
+  if (used >= plan.maxGuestPasses) {
+    return {
+      allowed: false,
+      error: `Monthly guest pass limit (${plan.maxGuestPasses}) reached for your plan. It resets at the start of next month.`,
+    };
   }
 
   return { allowed: true };
