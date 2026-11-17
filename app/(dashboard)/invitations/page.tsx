@@ -150,6 +150,18 @@ const Invitations: React.FC = () => {
     (i) => filter === "All" || i.status === filter
   );
 
+  // Per-status counts, so each filter can show how much is behind it and the
+  // Active pill can light up while anyone actually holds a live pass.
+  const statusCounts = React.useMemo(() => {
+    const counts: Record<string, number> = { All: invitations.length };
+    for (const i of invitations) {
+      counts[i.status] = (counts[i.status] || 0) + 1;
+    }
+    return counts;
+  }, [invitations]);
+
+  const activeCount = statusCounts[InvitationStatus.ACTIVE] || 0;
+
   const handleCopyGuestUrl = (e: React.MouseEvent, invitationId: string) => {
     e.stopPropagation();
     const url = `${window.location.origin}/guest/${invitationId}`;
@@ -192,26 +204,69 @@ const Invitations: React.FC = () => {
           { label: "Upcoming", value: InvitationStatus.UPCOMING },
           { label: "Expired", value: InvitationStatus.EXPIRED },
           { label: "Revoked", value: InvitationStatus.REVOKED },
-        ].map(({ label, value }) => (
-          <button
-            key={label}
-            onClick={() => setFilter(value as any)}
-            className={`px-6 py-3 rounded-2xl text-sm font-bold transition-all duration-300 relative ${
-              filter === value
-                ? "text-indigo-700"
-                : "text-slate-500 hover:text-indigo-600 hover:bg-white/50"
-            }`}
-          >
-            {filter === value && (
-              <motion.div
-                layoutId="filterTab"
-                className="absolute inset-0 bg-white rounded-2xl shadow-sm border border-indigo-100/50"
-                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-              />
-            )}
-            <span className="relative z-10">{label}</span>
-          </button>
-        ))}
+        ].map(({ label, value }) => {
+          // The Active pill lights up whenever at least one pass is live right
+          // now: emerald tint, a pulsing dot and the count. It stays lit while
+          // another filter is selected, so the page tells you someone is on
+          // site without you having to click through to find out.
+          const isActiveTab = value === InvitationStatus.ACTIVE;
+          const isLit = isActiveTab && activeCount > 0;
+          const count = statusCounts[value as string] || 0;
+          const selected = filter === value;
+
+          return (
+            <button
+              key={label}
+              onClick={() => setFilter(value as any)}
+              className={`px-6 py-3 rounded-2xl text-sm font-bold transition-all duration-300 relative ${
+                selected
+                  ? isLit
+                    ? "text-emerald-700"
+                    : "text-indigo-700"
+                  : isLit
+                    ? "text-emerald-600 hover:bg-white/50"
+                    : "text-slate-500 hover:text-indigo-600 hover:bg-white/50"
+              }`}
+            >
+              {selected && (
+                <motion.div
+                  layoutId="filterTab"
+                  className={`absolute inset-0 rounded-2xl shadow-sm border ${
+                    isLit ? "bg-white border-emerald-200/70" : "bg-white border-indigo-100/50"
+                  }`}
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                />
+              )}
+              {/* Lit-but-unselected gets its own emerald wash, since the shared
+                  layoutId pill can only ever be on one tab at a time. */}
+              {isLit && !selected && (
+                <span className="absolute inset-0 rounded-2xl bg-emerald-50/80 border border-emerald-200/60 shadow-[0_0_0_3px_rgba(16,185,129,0.08)]" />
+              )}
+              <span className="relative z-10 inline-flex items-center gap-2">
+                {isLit && (
+                  <span className="relative flex h-2 w-2 shrink-0">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                  </span>
+                )}
+                {label}
+                {count > 0 && (
+                  <span
+                    className={`rounded-lg px-1.5 py-0.5 text-[10px] font-black tabular-nums ${
+                      isLit
+                        ? "bg-emerald-100 text-emerald-700"
+                        : selected
+                          ? "bg-indigo-50 text-indigo-600"
+                          : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Error State */}

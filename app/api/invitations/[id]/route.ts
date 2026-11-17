@@ -1,10 +1,41 @@
 import { NextRequest } from 'next/server';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, asc, desc } from 'drizzle-orm';
 import { db } from '@/db';
-import { guestInvitation, guest, invitationScanEvent, guestQrSession, guestOtp } from '@/db/schema';
+import { guestInvitation, guest, invitationScanEvent, guestQrSession, guestOtp, securityPersonnel, orgAdmin } from '@/db/schema';
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, errorResponse, unauthorizedResponse, notFoundResponse } from '@/lib/api-response';
 import { toIST, fromIST } from '@/lib/timezone';
+
+/**
+ * One step in a pass's life, for the timeline on the invitation detail page.
+ *
+ * Carries BOTH an absolute instant and a display label on purpose. `at` is ISO
+ * UTC, which is what the client compares against "now" to decide whether a step
+ * has happened yet. `atLabel` is the IST string the rest of this app shows.
+ *
+ * Doing it this way avoids a trap: `toIST()` returns "yyyy-MM-dd HH:mm:ss" with
+ * no zone marker, and `new Date(...)` on that parses it as the BROWSER's local
+ * time. That happens to be right on an IST machine and silently wrong anywhere
+ * else, so it must not be used for comparisons.
+ */
+type TimelineStep = {
+  kind:
+    | 'CREATED'
+    | 'WINDOW_OPEN'
+    | 'QR_ISSUED'
+    | 'OTP_ISSUED'
+    | 'OTP_VERIFIED'
+    | 'SCAN_GRANTED'
+    | 'SCAN_DENIED'
+    | 'REVOKED'
+    | 'WINDOW_CLOSED';
+  at: string;
+  atLabel: string | null;
+  title: string;
+  detail?: string | null;
+  securityLevel?: number | null;
+  guard?: string | null;
+};
 
 // GET /api/invitations/[id] - Get a specific invitation with details
 export async function GET(
@@ -42,6 +73,9 @@ export async function GET(
         securityLevel: guestInvitation.requestedSecurityLevel,
         status: guestInvitation.status,
         createdAt: guestInvitation.createdAt,
+        // For the timeline's "created by" line only; stripped from the
+        // response below rather than exposing an internal admin id.
+        createdByOrgAdminId: guestInvitation.createdByOrgAdminId,
       })
       .from(guestInvitation)
       .leftJoin(guest, eq(guestInvitation.guestId, guest.id))
@@ -58,13 +92,16 @@ export async function GET(
     }
 
     // Ensure guest name has a fallback
+    const { createdByOrgAdminId, ...invitationFields } = invitation;
     const invitationData = {
-      ...invitation,
+      ...invitationFields,
       guestName: invitation.guestName || 'Unknown',
       guestPhone: invitation.guestPhone || 'N/A',
     };
 
-    // Fetch recent scan events for this invitation
+    // Fetch scan events, now with the guard who performed each one. Limit
+    // raised from 10 to 50: the timeline below is a full account of the pass,
+    // and silently dropping the oldest entries would misrepresent it.
     const scanEventsData = await db
       .select({
         id: invitationScanEvent.id,
@@ -72,11 +109,13 @@ export async function GET(
         success: invitationScanEvent.success,
         failureReason: invitationScanEvent.failureReason,
         securityLevel: invitationScanEvent.usedSecurityLevel,
+        guardUsername: securityPersonnel.username,
       })
       .from(invitationScanEvent)
+      .leftJoin(securityPersonnel, eq(invitationScanEvent.scannedBySecurityPersonnelId, securityPersonnel.id))
       .where(eq(invitationScanEvent.invitationId, id))
       .orderBy(desc(invitationScanEvent.timestamp))
-      .limit(10);
+      .limit(50);
 
     // Transform scan events for frontend with IST timezone
     const scanEvents = scanEventsData.map(scan => ({
@@ -99,6 +138,117 @@ export async function GET(
       .orderBy(desc(guestQrSession.createdAt))
       .limit(1);
 
+    // ---- Pass timeline -----------------------------------------------------
+    // Every recorded moment in this pass's life, in one chronological list.
+    // Assembled server-side so the sourcing rules live in exactly one place;
+    // whether a step has happened yet is left to the client, which compares
+    // `at` against the current time so the timeline advances on its own.
+    //
+    // There is deliberately no "guest left" step: invitation_scan_event has no
+    // direction, so a departure is not recorded anywhere. WINDOW_CLOSED is the
+    // honest end of the pass -- the access window closing, not the guest
+    // physically leaving.
+    const [allQrSessions, allOtps, creator] = await Promise.all([
+      db
+        .select({ createdAt: guestQrSession.createdAt })
+        .from(guestQrSession)
+        .where(eq(guestQrSession.invitationId, id))
+        .orderBy(asc(guestQrSession.createdAt)),
+      db
+        .select({
+          createdAt: guestOtp.createdAt,
+          verified: guestOtp.verified,
+          expiresAt: guestOtp.expiresAt,
+        })
+        .from(guestOtp)
+        .where(eq(guestOtp.invitationId, id))
+        .orderBy(asc(guestOtp.createdAt)),
+      db
+        .select({ email: orgAdmin.email })
+        .from(orgAdmin)
+        .where(eq(orgAdmin.id, createdByOrgAdminId))
+        .limit(1),
+    ]);
+
+    const step = (
+      kind: TimelineStep['kind'],
+      at: Date | null,
+      title: string,
+      extra: Partial<TimelineStep> = {}
+    ): TimelineStep | null =>
+      at ? { kind, at: new Date(at).toISOString(), atLabel: toIST(at), title, ...extra } : null;
+
+    const steps: (TimelineStep | null)[] = [
+      step('CREATED', invitation.createdAt, 'Pass created', {
+        detail: creator[0]?.email ? `by ${creator[0].email}` : null,
+      }),
+      step('WINDOW_OPEN', invitation.validFrom, 'Access window opens'),
+    ];
+
+    if (allQrSessions.length > 0) {
+      steps.push(
+        step('QR_ISSUED', allQrSessions[0].createdAt, 'QR pass issued', {
+          detail:
+            allQrSessions.length > 1
+              ? `rotated ${allQrSessions.length - 1} more time${allQrSessions.length - 1 === 1 ? '' : 's'}`
+              : null,
+        })
+      );
+    }
+
+    // One step per OTP, carrying its outcome, rather than a separate
+    // "verified" step. `guest_otp` records THAT an OTP was verified but not
+    // WHEN -- there is no verified_at column. An earlier version anchored the
+    // verification to `expires_at`, which put it a full OTP lifetime (300s) too
+    // late and showed it landing *after* the gate had already granted access.
+    // Better to report verification against the time we do know than to invent
+    // one that contradicts the scan record.
+    for (const otp of allOtps) {
+      steps.push(
+        step(
+          otp.verified ? 'OTP_VERIFIED' : 'OTP_ISSUED',
+          otp.createdAt,
+          otp.verified ? 'OTP issued and verified' : 'OTP issued',
+          { detail: otp.verified ? null : 'not verified' }
+        )
+      );
+    }
+
+    for (const scan of scanEventsData) {
+      steps.push(
+        step(
+          scan.success ? 'SCAN_GRANTED' : 'SCAN_DENIED',
+          scan.scannedAt,
+          scan.success ? 'Access granted at gate' : 'Access denied at gate',
+          {
+            detail: scan.failureReason,
+            securityLevel: scan.securityLevel,
+            guard: scan.guardUsername,
+          }
+        )
+      );
+    }
+
+    if (invitation.status === 'revoked') {
+      // No revoked_at column exists, so this is anchored to the row's last
+      // known state rather than the moment of revocation.
+      steps.push(step('REVOKED', invitation.validTo, 'Pass revoked'));
+    } else {
+      steps.push(step('WINDOW_CLOSED', invitation.validTo, 'Access window closed'));
+    }
+
+    // Chronological, except that CREATED always leads. An admin can set
+    // valid_from slightly in the past, which sorts "Access window opens" above
+    // "Pass created" and reads as the window opening before the pass existed.
+    const KIND_RANK: Partial<Record<TimelineStep['kind'], number>> = { CREATED: -1 };
+    const timeline = steps
+      .filter((s): s is TimelineStep => s !== null)
+      .sort((a, b) => {
+        const rank = (KIND_RANK[a.kind] ?? 0) - (KIND_RANK[b.kind] ?? 0);
+        if (rank !== 0) return rank;
+        return new Date(a.at).getTime() - new Date(b.at).getTime();
+      });
+
     return successResponse({
       ...invitationData,
       validFrom: toIST(invitationData.validFrom),
@@ -109,6 +259,7 @@ export async function GET(
         ...qrSession,
         expiresAt: toIST(qrSession.expiresAt),
       } : null,
+      timeline,
     });
   } catch (error) {
     console.error('Get invitation error:', error);

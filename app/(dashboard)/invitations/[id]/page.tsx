@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { SecurityLevel } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
+import { PassTimeline, type TimelineStep } from "./_components/pass-timeline";
 
 interface ScanEvent {
   id: number;
@@ -31,6 +32,8 @@ interface InvitationDetail {
     qrCode: string;
     expiresAt: string;
   } | null;
+  /** Full lifecycle of the pass, assembled by the API. */
+  timeline?: TimelineStep[];
 }
 
 export default function InvitationDetailPage() {
@@ -242,54 +245,26 @@ export default function InvitationDetailPage() {
         </div>
       </div>
 
-      {/* Scan Timeline */}
+      {/* Pass Timeline — the whole life of the pass, laid out like Zuppdate's
+          /e schedule. Replaces the old flat "Scan Activity" list, which showed
+          gate scans only and so left out creation, the QR being issued, OTP
+          verification and the window opening and closing. */}
       <div className="bg-white/70 backdrop-blur-xl rounded-[2rem] border border-white shadow-xl overflow-hidden">
-        <div className="p-7 border-b border-slate-100/60">
-          <h3 className="font-black text-slate-900 text-lg">Scan Activity</h3>
-          <p className="text-xs text-slate-400 font-medium mt-0.5">{invitation.scanEvents.length} event{invitation.scanEvents.length !== 1 ? "s" : ""} recorded</p>
+        <div className="p-7 border-b border-slate-100/60 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h3 className="font-black text-slate-900 text-lg">Pass Timeline</h3>
+            <p className="text-xs text-slate-400 font-medium mt-0.5">
+              {(invitation.timeline?.length ?? 0)} step{(invitation.timeline?.length ?? 0) !== 1 ? "s" : ""} ·{" "}
+              {invitation.scanEvents.length} gate scan{invitation.scanEvents.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            Times in IST
+          </p>
         </div>
 
         <div className="p-7">
-          {invitation.scanEvents.length === 0 ? (
-            <div className="py-12 text-center">
-              <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <ICONS.Logs className="text-slate-300 w-8 h-8" />
-              </div>
-              <p className="text-slate-500 font-medium">No scan activity yet</p>
-              <p className="text-xs text-slate-400 mt-1">Scans will appear here once the guest uses their pass</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <AnimatePresence>
-                {invitation.scanEvents.map((log, i) => (
-                  <motion.div key={log.id}
-                    initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    className="flex items-center gap-4 p-4 rounded-2xl hover:bg-slate-50/80 transition-colors">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                      log.scanResult === "SUCCESS" ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"
-                    }`}>
-                      {log.scanResult === "SUCCESS" ? <ICONS.Success size={18} /> : <ICONS.Failure size={18} />}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-black text-slate-900">
-                        {log.scanResult === "SUCCESS" ? "Access Granted" : "Access Denied"}
-                      </p>
-                      <p className="text-xs text-slate-400 font-medium mt-0.5">
-                        {new Date(log.scannedAt).toLocaleString()}
-                      </p>
-                      {log.failureReason && (
-                        <p className="text-xs text-rose-600 font-medium mt-1">{log.failureReason}</p>
-                      )}
-                    </div>
-                    <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2.5 py-1 rounded-lg">
-                      L{log.securityLevel}
-                    </span>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-          )}
+          <PassTimeline timeline={invitation.timeline ?? []} />
         </div>
       </div>
     </motion.div>
