@@ -196,20 +196,38 @@ export async function GET(
       );
     }
 
-    // One step per OTP, carrying its outcome, rather than a separate
-    // "verified" step. `guest_otp` records THAT an OTP was verified but not
-    // WHEN -- there is no verified_at column. An earlier version anchored the
-    // verification to `expires_at`, which put it a full OTP lifetime (300s) too
-    // late and showed it landing *after* the gate had already granted access.
-    // Better to report verification against the time we do know than to invent
-    // one that contradicts the scan record.
-    for (const otp of allOtps) {
+    // ONE OTP step, for the most recently issued code -- the same collapsing
+    // the QR step above does. A single L4 entry can mint a code per attempt
+    // (the production data has passes with several), and a row each would bury
+    // the gate scans that actually matter under repeated "OTP issued".
+    //
+    // There is no separate "verified" step: `guest_otp` records THAT a code was
+    // verified but not WHEN -- no verified_at column. An earlier version
+    // anchored verification to `expires_at`, which put it a full OTP lifetime
+    // (300s) late and rendered it *after* the gate had already granted access.
+    // Reporting it against the issue time we do know beats inventing one that
+    // contradicts the scan record.
+    //
+    // When an earlier code was the one verified and the latest was not, that is
+    // said explicitly rather than quietly dropped -- it is what explains a
+    // successful scan sitting between the two.
+    if (allOtps.length > 0) {
+      const lastOtp = allOtps[allOtps.length - 1];
+      const anyVerified = allOtps.some((o) => o.verified);
+      const detailParts: string[] = [];
+      if (allOtps.length > 1) {
+        detailParts.push(`${allOtps.length} codes issued`);
+      }
+      if (!lastOtp.verified) {
+        detailParts.push(anyVerified ? 'an earlier code was verified' : 'not verified');
+      }
+
       steps.push(
         step(
-          otp.verified ? 'OTP_VERIFIED' : 'OTP_ISSUED',
-          otp.createdAt,
-          otp.verified ? 'OTP issued and verified' : 'OTP issued',
-          { detail: otp.verified ? null : 'not verified' }
+          lastOtp.verified || anyVerified ? 'OTP_VERIFIED' : 'OTP_ISSUED',
+          lastOtp.createdAt,
+          lastOtp.verified ? 'OTP issued and verified' : 'OTP issued',
+          { detail: detailParts.length > 0 ? detailParts.join(' · ') : null }
         )
       );
     }

@@ -46,6 +46,8 @@ export default function InvitationDetailPage() {
   const [error, setError] = useState('');
   const [revoking, setRevoking] = useState(false);
   const [copied, setCopied] = useState(false);
+  /** "details" is the default so the page opens exactly as it did before. */
+  const [tab, setTab] = useState<"details" | "guest">("details");
 
   useEffect(() => { fetchInvitationDetail(); }, [id]);
 
@@ -154,6 +156,71 @@ export default function InvitationDetailPage() {
         Back to Invitations
       </button>
 
+      {/* Tabs. "Pass Details" is the default and renders exactly what this page
+          always rendered. "Guest Pass" opens the visitor-facing /guest/[id]
+          page in place, so the live rotating QR and OTP can be checked from the
+          dashboard instead of only being copyable as a link. */}
+      <div className="bg-white/60 backdrop-blur-xl p-2 rounded-3xl shadow-xl shadow-indigo-100/20 border border-white inline-flex gap-2">
+        {([
+          { label: "Pass Details", value: "details" as const, icon: ICONS.Info },
+          { label: "Guest Pass", value: "guest" as const, icon: ICONS.Key },
+        ]).map(({ label, value, icon: TabIcon }) => (
+          <button
+            key={value}
+            onClick={() => setTab(value)}
+            className={`px-5 py-2.5 rounded-2xl text-sm font-bold transition-all duration-300 relative ${
+              tab === value ? "text-indigo-700" : "text-slate-500 hover:text-indigo-600 hover:bg-white/50"
+            }`}
+          >
+            {tab === value && (
+              <motion.div
+                layoutId="invitationDetailTab"
+                className="absolute inset-0 bg-white rounded-2xl shadow-sm border border-indigo-100/50"
+                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+              />
+            )}
+            <span className="relative z-10 inline-flex items-center gap-2">
+              <TabIcon size={15} />
+              {label}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {tab === "guest" ? (
+        <div className="bg-white/70 backdrop-blur-xl rounded-[2rem] border border-white shadow-xl overflow-hidden">
+          <div className="p-7 border-b border-slate-100/60 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 className="font-black text-slate-900 text-lg">Guest Pass</h3>
+              <p className="text-xs text-slate-400 font-medium mt-0.5">
+                Exactly what {invitation.guestName} sees at <span className="font-mono">/guest/{invitation.id}</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={handleCopyLink}
+                className={`py-2.5 px-4 rounded-2xl font-bold text-xs transition-all flex items-center justify-center gap-2 border ${
+                  copied
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100"
+                }`}>
+                {copied ? <><ICONS.Success size={14} /> Copied</> : <><ICONS.Link size={14} /> Copy Link</>}
+              </button>
+              <a href={`/guest/${invitation.id}`} target="_blank" rel="noopener noreferrer"
+                className="py-2.5 px-4 rounded-2xl font-bold text-xs bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 transition-all inline-flex items-center gap-2">
+                <ICONS.ArrowRight size={14} /> Open
+              </a>
+            </div>
+          </div>
+          {/* Same-origin embed of the real page, so the QR and OTP rotate here
+              exactly as they do on the guest's phone rather than being a mock. */}
+          <iframe
+            src={`/guest/${invitation.id}`}
+            title={`Guest pass for ${invitation.guestName}`}
+            className="w-full h-[70vh] min-h-[520px] border-0 bg-white"
+          />
+        </div>
+      ) : (
+      <>
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         {/* QR Panel */}
         <div className="md:col-span-2 flex flex-col gap-5">
@@ -267,6 +334,8 @@ export default function InvitationDetailPage() {
           <PassTimeline timeline={invitation.timeline ?? []} />
         </div>
       </div>
+      </>
+      )}
     </motion.div>
   );
 }
