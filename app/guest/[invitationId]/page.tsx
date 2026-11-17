@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import { ICONS, SECURITY_INFO } from "@/constants";
 import { motion, AnimatePresence } from "framer-motion";
+import { PassTimeline, type TimelineStep } from "@/components/pass-timeline";
 
 interface QRData {
   qrSession: { qrCode: string; expiresAt: string; createdAt: string };
@@ -18,6 +19,8 @@ interface QRData {
     guestName: string;
   };
   organization: { name: string; type: string; imageUrl: string };
+  /** The pass's progress, redacted for the guest (no staff identities). */
+  timeline?: TimelineStep[];
   qrExpirySeconds: number;
   otpExpirySeconds: number;
 }
@@ -30,6 +33,8 @@ export default function GuestQRPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [qrTimeLeft, setQrTimeLeft] = useState(0);
+  /** "pass" is the default so the page opens on the QR exactly as before. */
+  const [tab, setTab] = useState<"pass" | "progress">("pass");
   const [otpTimeLeft, setOtpTimeLeft] = useState(0);
 
   const fetchQRData = async () => {
@@ -138,6 +143,46 @@ export default function GuestQRPage() {
           <span className="text-xs font-medium opacity-70">· {securityInfo?.description}</span>
         </motion.div>
 
+        {/* Tabs. "My Pass" is the default and shows the QR exactly as this page
+            always did; "Progress" shows where this pass has got to so far. */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.12 }}
+          className="bg-white/70 backdrop-blur-xl p-1.5 rounded-2xl shadow-lg shadow-slate-200/60 border border-white grid grid-cols-2 gap-1.5">
+          {([
+            { label: "My Pass", value: "pass" as const },
+            { label: "Progress", value: "progress" as const },
+          ]).map(({ label, value }) => (
+            <button
+              key={value}
+              onClick={() => setTab(value)}
+              className={`relative py-2.5 rounded-xl text-sm font-bold transition-colors ${
+                tab === value ? "text-indigo-700" : "text-slate-500"
+              }`}
+            >
+              {tab === value && (
+                <motion.div
+                  layoutId="guestPassTab"
+                  className="absolute inset-0 bg-white rounded-xl shadow-sm border border-indigo-100/60"
+                  transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
+                />
+              )}
+              <span className="relative z-10">{label}</span>
+            </button>
+          ))}
+        </motion.div>
+
+        {tab === "progress" ? (
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-[2rem] shadow-2xl shadow-slate-200 border border-slate-100 overflow-hidden">
+            <div className="px-6 pt-6 pb-2">
+              <h2 className="font-black text-slate-900 text-lg">Your pass so far</h2>
+              <p className="text-xs text-slate-400 font-medium mt-0.5">Times shown in IST</p>
+            </div>
+            <div className="px-5 pb-6 pt-2">
+              <PassTimeline timeline={qrData.timeline ?? []} />
+            </div>
+          </motion.div>
+        ) : (
+        <>
         {/* QR Card */}
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
           className="bg-white rounded-[2rem] shadow-2xl shadow-slate-200 border border-slate-100 overflow-hidden">
@@ -257,6 +302,9 @@ export default function GuestQRPage() {
             ))}
           </ol>
         </motion.div>
+
+        </>
+        )}
 
         {/* Footer */}
         <div className="text-center pt-4 pb-2">

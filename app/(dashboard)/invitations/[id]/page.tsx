@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { SecurityLevel } from "@/types";
 import { motion, AnimatePresence } from "framer-motion";
-import { PassTimeline, type TimelineStep } from "./_components/pass-timeline";
+import { PassTimeline, type TimelineStep } from "@/components/pass-timeline";
 
 interface ScanEvent {
   id: number;

@@ -3,6 +3,7 @@ import { eq, and, gte, desc } from 'drizzle-orm';
 import { db } from '@/db';
 import { guestInvitation, guestQrSession, guestOtp, guest, organizationNode } from '@/db/schema';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
+import { buildPassTimeline } from '@/lib/pass-timeline';
 import crypto from 'crypto';
 
 // GET /api/guest/[invitationId]/qr - Get or create QR session and OTP for guest (NO AUTH REQUIRED)
@@ -24,6 +25,7 @@ export async function GET(
           validTo: guestInvitation.validTo,
           status: guestInvitation.status,
           employeeName: guestInvitation.employeeName,
+          createdAt: guestInvitation.createdAt,
         },
         guest: {
           name: guest.name,
@@ -152,6 +154,21 @@ export async function GET(
     }
 
     // Return QR session and OTP (if applicable)
+    // The guest's own view of their pass's progress. Same builder as the org
+    // admin's detail page, so the two can never tell different stories -- but
+    // the 'guest' audience strips the issuing admin and the scanning guard,
+    // which a visitor has no business seeing on a page that needs no login.
+    const timeline = await buildPassTimeline(
+      invitationId,
+      {
+        createdAt: invitation.createdAt,
+        validFrom: invitation.validFrom,
+        validTo: invitation.validTo,
+        status: invitation.status,
+      },
+      'guest'
+    );
+
     return successResponse({
       qrSession: {
         qrCode: qrSession.rotatingKey,
@@ -181,6 +198,7 @@ export async function GET(
       },
       qrExpirySeconds,
       otpExpirySeconds,
+      timeline,
     });
   } catch (error) {
     console.error('Get guest QR error:', error);

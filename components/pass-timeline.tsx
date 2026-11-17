@@ -21,24 +21,8 @@ import { ICONS } from "@/constants";
  * comparison; `atLabel` is the IST string shown to the reader.
  */
 
-export type TimelineStep = {
-  kind:
-    | "CREATED"
-    | "WINDOW_OPEN"
-    | "QR_ISSUED"
-    | "OTP_ISSUED"
-    | "OTP_VERIFIED"
-    | "SCAN_GRANTED"
-    | "SCAN_DENIED"
-    | "REVOKED"
-    | "WINDOW_CLOSED";
-  at: string;
-  atLabel: string | null;
-  title: string;
-  detail?: string | null;
-  securityLevel?: number | null;
-  guard?: string | null;
-};
+export type { TimelineStep } from "@/lib/pass-timeline";
+import type { TimelineStep } from "@/lib/pass-timeline";
 
 type Tone = "neutral" | "good" | "bad" | "warn";
 
