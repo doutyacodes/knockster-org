@@ -10,6 +10,7 @@ import {
 } from '@/db/schema';
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
+import { whereDerivedStatus } from '@/lib/invitation-status';
 import { toIST } from '@/lib/timezone';
 
 // GET /api/mobile-api/security/dashboard - Get security guard's dashboard stats
@@ -99,7 +100,7 @@ export async function GET(req: NextRequest) {
         .where(
           and(
             eq(guestInvitation.organizationNodeId, guardInfo[0].organizationNodeId),
-            eq(guestInvitation.status, 'active')
+            whereDerivedStatus('active')
           )
         );
       activeInvitationsCount = Number(activeInvitations[0]?.count || 0);

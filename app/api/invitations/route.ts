@@ -8,17 +8,10 @@ import { toIST, fromIST } from '@/lib/timezone';
 import { checkCanCreateInvitation } from '@/lib/subscription';
 import { linkGuestToUser } from '@/lib/account-link';
 import { visitorType } from '@/db/schema';
+import { invitationStatusForFrontend, whereDerivedStatus, type DerivedInvitationStatus } from '@/lib/invitation-status';
 
-// Map database status to frontend status
-const mapStatusToFrontend = (dbStatus: string): string => {
-  const statusMap: Record<string, string> = {
-    'active': 'Active',
-    'pending': 'Upcoming',
-    'expired': 'Expired',
-    'revoked': 'Revoked'
-  };
-  return statusMap[dbStatus] || dbStatus;
-};
+// Status is no longer relabelled from the stored column -- it is derived from
+// the validity window on read. See lib/invitation-status.ts.
 
 // Map frontend status to database status
 const mapStatusToDatabase = (frontendStatus: string): 'active' | 'pending' | 'expired' | 'revoked' => {
@@ -61,9 +54,11 @@ export async function GET(req: NextRequest) {
     const conditions = [eq(guestInvitation.organizationNodeId, organizationNodeId!)];
 
     if (status && status !== 'all') {
-      // Map frontend status to database status
-      const dbStatus = mapStatusToDatabase(status);
-      conditions.push(eq(guestInvitation.status, dbStatus));
+      // Filter on the DERIVED status, not the stored column -- the column goes
+      // stale (see lib/invitation-status.ts), so filtering on it returned
+      // long-expired passes under "Active".
+      const dbStatus = mapStatusToDatabase(status) as DerivedInvitationStatus;
+      conditions.push(whereDerivedStatus(dbStatus));
     }
 
     // Fetch invitations with guest details
@@ -96,7 +91,7 @@ export async function GET(req: NextRequest) {
       validFrom: toIST(inv.validFrom),
       validTo: toIST(inv.validTo),
       securityLevel: mapSecurityLevelToFrontend(inv.securityLevel!),
-      status: mapStatusToFrontend(inv.status),
+      status: invitationStatusForFrontend(inv.status, inv.validFrom, inv.validTo),
       createdAt: toIST(inv.createdAt),
     }));
 
@@ -267,7 +262,7 @@ export async function POST(req: NextRequest) {
       validFrom: toIST(invitation.validFrom),
       validTo: toIST(invitation.validTo),
       securityLevel: mapSecurityLevelToFrontend(invitation.securityLevel!),
-      status: mapStatusToFrontend(invitation.status),
+      status: invitationStatusForFrontend(invitation.status, invitation.validFrom, invitation.validTo),
       createdAt: toIST(invitation.createdAt),
     };
 

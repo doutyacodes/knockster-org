@@ -6,6 +6,7 @@ import { authenticateRequest } from '@/lib/auth';
 import { successResponse, errorResponse, unauthorizedResponse, notFoundResponse } from '@/lib/api-response';
 import { toIST, fromIST } from '@/lib/timezone';
 import { buildPassTimeline } from '@/lib/pass-timeline';
+import { invitationStatusForFrontend } from '@/lib/invitation-status';
 
 // GET /api/invitations/[id] - Get a specific invitation with details
 export async function GET(
@@ -67,6 +68,13 @@ export async function GET(
       ...invitationFields,
       guestName: invitation.guestName || 'Unknown',
       guestPhone: invitation.guestPhone || 'N/A',
+      // Derived, not the stored column, which goes stale.
+      // See lib/invitation-status.ts.
+      status: invitationStatusForFrontend(
+        invitation.status,
+        invitation.validFrom,
+        invitation.validTo
+      ).toUpperCase(),
     };
 
     // Fetch scan events, now with the guard who performed each one. Limit

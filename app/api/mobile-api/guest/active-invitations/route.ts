@@ -10,6 +10,7 @@ import {
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
 import { toIST } from '@/lib/timezone';
+import { whereDerivedStatus } from '@/lib/invitation-status';
 import crypto from 'crypto';
 
 // GET /api/mobile-api/guest/active-invitations - Get active invitations with QR codes
@@ -50,7 +51,9 @@ export async function GET(req: NextRequest) {
       .where(
         and(
           eq(guestInvitation.guestId, guestId!),
-          eq(guestInvitation.status, 'active')
+          // Derived: the stored column goes stale, which meant the guest app
+          // listed long-expired passes as usable. See lib/invitation-status.ts.
+          whereDerivedStatus('active')
         )
       )
       .orderBy(guestInvitation.requestedSecurityLevel); // Order by security level

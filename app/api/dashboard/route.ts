@@ -11,6 +11,7 @@ import {
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
 import { toIST } from '@/lib/timezone';
+import { whereDerivedStatus } from '@/lib/invitation-status';
 
 // GET /api/dashboard - Get dashboard statistics and data
 export async function GET(req: NextRequest) {
@@ -52,7 +53,8 @@ export async function GET(req: NextRequest) {
       .where(
         and(
           eq(guestInvitation.organizationNodeId, organizationNodeId!),
-          eq(guestInvitation.status, 'active')
+          // Derived, not the stored column -- see lib/invitation-status.ts.
+          whereDerivedStatus('active')
         )
       );
     const activeInvitations = Number(activeInvitationsResult[0]?.count || 0);
@@ -64,7 +66,7 @@ export async function GET(req: NextRequest) {
       .where(
         and(
           eq(guestInvitation.organizationNodeId, organizationNodeId!),
-          eq(guestInvitation.status, 'pending')
+          whereDerivedStatus('pending')
         )
       );
     const upcomingVisits = Number(upcomingVisitsResult[0]?.count || 0);

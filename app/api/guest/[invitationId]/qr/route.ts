@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { guestInvitation, guestQrSession, guestOtp, guest, organizationNode } from '@/db/schema';
 import { successResponse, errorResponse, notFoundResponse } from '@/lib/api-response';
 import { buildPassTimeline } from '@/lib/pass-timeline';
+import { deriveInvitationStatus } from '@/lib/invitation-status';
 import crypto from 'crypto';
 
 // GET /api/guest/[invitationId]/qr - Get or create QR session and OTP for guest (NO AUTH REQUIRED)
@@ -48,17 +49,24 @@ export async function GET(
 
     const { invitation, guest: guestInfo, organization } = invitationData;
 
-    // Check if invitation is valid
     const now = new Date();
-    if (invitation.status === 'revoked') {
+
+    // Validity, from the one shared derivation. These checks were already
+    // date-based and therefore already correct; routing them through the helper
+    // keeps them from drifting away from everywhere else that asks the same
+    // question. See lib/invitation-status.ts.
+    const derivedStatus = deriveInvitationStatus(
+      invitation.status,
+      invitation.validFrom,
+      invitation.validTo
+    );
+    if (derivedStatus === 'revoked') {
       return errorResponse('This invitation has been revoked', 403);
     }
-
-    if (invitation.status === 'expired' || invitation.validTo < now) {
+    if (derivedStatus === 'expired') {
       return errorResponse('This invitation has expired', 403);
     }
-
-    if (invitation.validFrom > now) {
+    if (derivedStatus === 'pending') {
       return errorResponse('This invitation is not yet active', 403);
     }
 
@@ -187,7 +195,7 @@ export async function GET(
         securityLevel: invitation.securityLevel,
         validFrom: invitation.validFrom,
         validTo: invitation.validTo,
-        status: invitation.status,
+        status: derivedStatus,
         employeeName: invitation.employeeName,
         guestName: guestInfo.name,
       },

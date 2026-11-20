@@ -10,6 +10,7 @@ import {
 } from '@/db/schema';
 import { authenticateRequest, JWT_SECRET } from '@/lib/auth';
 import { successResponse, errorResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
+import { whereDerivedStatus } from '@/lib/invitation-status';
 import crypto from 'crypto';
 
 // POST /api/mobile-api/guest/scan-security - Guest scans security QR (L3/L4)
@@ -106,7 +107,7 @@ export async function POST(req: NextRequest) {
       .where(
         and(
           eq(guestInvitation.guestId, guestId!),
-          eq(guestInvitation.status, 'active')
+          whereDerivedStatus('active')
         )
       )
       .orderBy(guestInvitation.requestedSecurityLevel); // Will pick highest

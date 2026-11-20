@@ -43,3 +43,7 @@ next-env.d.ts
 
 # super
 knockster-super/
+# Expo mobile apps (knocksterSecurity / knocksterUser).
+# Each has its own git repo; they are kept here for convenience only and must
+# not be committed into this one.
+/mobile-app
