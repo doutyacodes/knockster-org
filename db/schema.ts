@@ -151,7 +151,14 @@ export const guestInvitation = mysqlTable('guest_invitation', {
   validTo: timestamp('valid_to').notNull(),
   requestedSecurityLevel: int('requested_security_level').notNull(), // 1-4 for L1-L4
   status: mysqlEnum('status', ['pending', 'active', 'expired', 'revoked']).default('pending').notNull(),
-  createdByOrgAdminId: varchar('created_by_org_admin_id', { length: 36 }).notNull(),
+  // Nullable: a pass a guest self-issued from a Zuppdate event page has no org
+  // admin behind it. Still set for every pass created from this dashboard.
+  createdByOrgAdminId: varchar('created_by_org_admin_id', { length: 36 }),
+  // Set when this pass is a Zuppdate event's gate pass rather than an ordinary
+  // office visitor pass. Same table on purpose: L1-L4, QR rotation, OTP, scan
+  // logging and both Expo apps then work on event passes unchanged.
+  // Length 191 to match Zuppdate's events.id (a cuid), not 36.
+  eventId: varchar('event_id', { length: 191 }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

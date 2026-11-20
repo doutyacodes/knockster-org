@@ -1,4 +1,4 @@
-import { mysqlTable, varchar, timestamp, boolean, mysqlEnum } from 'drizzle-orm/mysql-core';
+import { mysqlTable, varchar, timestamp, boolean, mysqlEnum, int, text, datetime } from 'drizzle-orm/mysql-core';
 
 /**
  * READ-ONLY view of Zuppdate's tables, for the single-login link.
@@ -36,4 +36,86 @@ export const zuppdateUsers = mysqlTable('users', {
   avatarUrl: varchar('avatarUrl', { length: 191 }),
   accountType: mysqlEnum('accountType', ['PERSONAL', 'BUSINESS', 'PROPERTY_MANAGER']).notNull(),
   createdAt: timestamp('createdAt', { fsp: 3 }).notNull(),
+});
+
+/**
+ * EVENT SECURITY — the Zuppdate side of gated events.
+ *
+ * A Zuppdate event can hand its guests a real Zuppgate entry pass plus
+ * food/perk coupons redeemed at the same gate. Zuppgate needs to read these to
+ * show a guard what event a pass belongs to, to let a venue admin approve an
+ * event being hosted at their node, and to redeem coupons.
+ *
+ * READ-ONLY, with two exceptions Zuppgate legitimately writes because they are
+ * gate actions, not event data: `event_coupon_grants.used_count` and rows in
+ * `event_coupon_redemptions`. Everything else belongs to Zuppdate.
+ *
+ * Note these are DATETIME(3) columns (Prisma's default), NOT the TIMESTAMP that
+ * Zuppgate's own tables use — so they are NOT affected by the session time zone
+ * pinning in db/index.ts. Zuppdate stores UTC-anchored wall-clock values in
+ * them; do not mix them with Zuppgate timestamps in arithmetic without
+ * converting deliberately.
+ */
+export const zuppdateEvents = mysqlTable('events', {
+  id: varchar('id', { length: 191 }).primaryKey(),
+  organizerId: varchar('organizerId', { length: 191 }).notNull(),
+  name: varchar('name', { length: 191 }).notNull(),
+  description: text('description'),
+  coverImageUrl: varchar('coverImageUrl', { length: 191 }),
+  eventType: varchar('eventType', { length: 191 }).notNull(),
+  startDate: datetime('startDate', { fsp: 3 }).notNull(),
+  endDate: datetime('endDate', { fsp: 3 }),
+  location: varchar('location', { length: 191 }),
+  publicSlug: varchar('publicSlug', { length: 191 }).notNull(),
+  status: mysqlEnum('status', ['DRAFT', 'PUBLISHED']).notNull(),
+});
+
+export const zuppdateEventSecurity = mysqlTable('event_security', {
+  id: varchar('id', { length: 191 }).primaryKey(),
+  eventId: varchar('event_id', { length: 191 }).notNull(),
+  isEnabled: boolean('is_enabled').notNull(),
+  mode: mysqlEnum('mode', ['VENUE', 'STANDALONE']).notNull(),
+  organizationNodeId: varchar('organization_node_id', { length: 36 }),
+  venueApproval: mysqlEnum('venue_approval', ['NOT_REQUIRED', 'PENDING', 'APPROVED', 'DECLINED']).notNull(),
+  venueRequestedAt: datetime('venue_requested_at', { fsp: 3 }),
+  venueDecidedAt: datetime('venue_decided_at', { fsp: 3 }),
+  venueDecidedBy: varchar('venue_decided_by', { length: 36 }),
+  venueDeclineReason: text('venue_decline_reason'),
+  securityLevel: int('security_level').notNull(),
+  maxPasses: int('max_passes'),
+  passValidFrom: datetime('pass_valid_from', { fsp: 3 }),
+  passValidTo: datetime('pass_valid_to', { fsp: 3 }),
+});
+
+export const zuppdateEventCoupons = mysqlTable('event_coupons', {
+  id: varchar('id', { length: 191 }).primaryKey(),
+  eventId: varchar('event_id', { length: 191 }).notNull(),
+  title: varchar('title', { length: 120 }).notNull(),
+  description: text('description'),
+  maxUses: int('max_uses').notNull(),
+  validFrom: datetime('valid_from', { fsp: 3 }),
+  validTo: datetime('valid_to', { fsp: 3 }),
+  isActive: boolean('is_active').notNull(),
+  order: int('order').notNull(),
+});
+
+/** Writable: `used_count` is incremented by the gate on redemption. */
+export const zuppdateEventCouponGrants = mysqlTable('event_coupon_grants', {
+  id: varchar('id', { length: 191 }).primaryKey(),
+  couponId: varchar('coupon_id', { length: 191 }).notNull(),
+  invitationId: varchar('invitation_id', { length: 36 }).notNull(),
+  redeemKey: varchar('redeem_key', { length: 64 }).notNull(),
+  usedCount: int('used_count').notNull(),
+  createdAt: datetime('created_at', { fsp: 3 }).notNull(),
+  updatedAt: datetime('updated_at', { fsp: 3 }).notNull(),
+});
+
+/** Writable: the gate appends an attempt per scan, successful or not. */
+export const zuppdateEventCouponRedemptions = mysqlTable('event_coupon_redemptions', {
+  id: varchar('id', { length: 191 }).primaryKey(),
+  grantId: varchar('grant_id', { length: 191 }).notNull(),
+  redeemedBySecurityPersonnelId: varchar('redeemed_by_security_personnel_id', { length: 36 }),
+  success: boolean('success').notNull(),
+  failureReason: text('failure_reason'),
+  at: datetime('at', { fsp: 3 }).notNull(),
 });
