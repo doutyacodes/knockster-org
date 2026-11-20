@@ -37,6 +37,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, onLogout, variant = "app" }) => {
     { name: "Invitations", icon: ICONS.Invitations, path: "/invitations" },
     { name: "Personnel", icon: ICONS.Personnel, path: "/personnel" },
     { name: "Visitor Types", icon: ICONS.Users, path: "/visitor-types" },
+    { name: "Event Requests", icon: ICONS.Calendar, path: "/event-requests" },
     { name: "Alerts", icon: ICONS.Alerts, path: "/alerts" },
     { name: "About", icon: ICONS.Info, path: "/about" },
     { name: "Profile", icon: ICONS.Profile, path: "/profile" },

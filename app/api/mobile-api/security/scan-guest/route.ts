@@ -9,6 +9,7 @@ import {
   invitationScanEvent,
   organizationNode,
 } from '@/db/schema';
+import { zuppdateEvents } from '@/db/zuppdate-schema';
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, errorResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
 import crypto from 'crypto';
@@ -55,10 +56,16 @@ export async function POST(req: NextRequest) {
         organizationNodeId: guestInvitation.organizationNodeId,
         orgName: organizationNode.name,
         orgType: organizationNode.type,
+        // Null for an ordinary office visitor pass; set when this pass belongs
+        // to a Zuppdate event, so the guard sees which door they are on.
+        eventId: guestInvitation.eventId,
+        eventName: zuppdateEvents.name,
+        eventSlug: zuppdateEvents.publicSlug,
       })
       .from(guestInvitation)
       .leftJoin(guest, eq(guestInvitation.guestId, guest.id))
       .leftJoin(organizationNode, eq(guestInvitation.organizationNodeId, organizationNode.id))
+      .leftJoin(zuppdateEvents, eq(guestInvitation.eventId, zuppdateEvents.id))
       .where(eq(guestInvitation.id, invitationId))
       .limit(1);
 
@@ -146,6 +153,10 @@ export async function POST(req: NextRequest) {
             type: invitation.orgType,
           },
           isPreApproved,
+          // Additive: null unless this is an event pass.
+          event: invitation.eventId
+            ? { id: invitation.eventId, name: invitation.eventName, slug: invitation.eventSlug }
+            : null,
         },
       });
     }
@@ -170,6 +181,9 @@ export async function POST(req: NextRequest) {
             type: invitation.orgType,
           },
           isPreApproved,
+          event: invitation.eventId
+            ? { id: invitation.eventId, name: invitation.eventName, slug: invitation.eventSlug }
+            : null,
         },
       });
     }

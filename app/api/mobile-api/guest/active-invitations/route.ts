@@ -11,6 +11,11 @@ import { authenticateRequest } from '@/lib/auth';
 import { successResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
 import { toIST } from '@/lib/timezone';
 import { whereDerivedStatus } from '@/lib/invitation-status';
+import {
+  zuppdateEvents,
+  zuppdateEventCoupons,
+  zuppdateEventCouponGrants,
+} from '@/db/zuppdate-schema';
 import crypto from 'crypto';
 
 // GET /api/mobile-api/guest/active-invitations - Get active invitations with QR codes
@@ -45,9 +50,17 @@ export async function GET(req: NextRequest) {
         organizationNodeId: guestInvitation.organizationNodeId,
         organizationName: organizationNode.name,
         organizationType: organizationNode.type,
+        // Null for an ordinary visitor pass; set when this pass is a Zuppdate
+        // event's gate pass, so the app can label it and show its coupons.
+        eventId: guestInvitation.eventId,
+        eventName: zuppdateEvents.name,
+        eventSlug: zuppdateEvents.publicSlug,
+        eventType: zuppdateEvents.eventType,
+        eventLocation: zuppdateEvents.location,
       })
       .from(guestInvitation)
       .leftJoin(organizationNode, eq(guestInvitation.organizationNodeId, organizationNode.id))
+      .leftJoin(zuppdateEvents, eq(guestInvitation.eventId, zuppdateEvents.id))
       .where(
         and(
           eq(guestInvitation.guestId, guestId!),
@@ -135,6 +148,60 @@ export async function GET(req: NextRequest) {
           }
         }
 
+        // Coupons, for event passes only. One query per event pass; a guest
+        // holds very few passes at once, so this stays cheap.
+        let coupons: {
+          grantId: string;
+          redeemKey: string;
+          title: string;
+          description: string | null;
+          usedCount: number;
+          maxUses: number;
+          remaining: number;
+          validFrom: string | null;
+          validTo: string | null;
+          qrData: string;
+        }[] = [];
+
+        if (invitation.eventId) {
+          const grants = await db
+            .select({
+              grantId: zuppdateEventCouponGrants.id,
+              redeemKey: zuppdateEventCouponGrants.redeemKey,
+              usedCount: zuppdateEventCouponGrants.usedCount,
+              title: zuppdateEventCoupons.title,
+              description: zuppdateEventCoupons.description,
+              maxUses: zuppdateEventCoupons.maxUses,
+              validFrom: zuppdateEventCoupons.validFrom,
+              validTo: zuppdateEventCoupons.validTo,
+              isActive: zuppdateEventCoupons.isActive,
+              order: zuppdateEventCoupons.order,
+            })
+            .from(zuppdateEventCouponGrants)
+            .innerJoin(zuppdateEventCoupons, eq(zuppdateEventCouponGrants.couponId, zuppdateEventCoupons.id))
+            .where(eq(zuppdateEventCouponGrants.invitationId, invitation.id))
+            .orderBy(zuppdateEventCoupons.order);
+
+          coupons = grants
+            .filter((g) => g.isActive)
+            .map((g) => ({
+              grantId: g.grantId,
+              redeemKey: g.redeemKey,
+              title: g.title,
+              description: g.description,
+              usedCount: g.usedCount,
+              maxUses: g.maxUses,
+              remaining: Math.max(0, g.maxUses - g.usedCount),
+              // The payload the security app's scanner expects.
+              qrData: JSON.stringify({ type: 'coupon', grantId: g.grantId, key: g.redeemKey }),
+              // Zuppdate DATETIME(3) wall-clock values, passed through rather
+              // than run through toIST -- converting would shift the organiser's
+              // stated time. See db/zuppdate-schema.ts.
+              validFrom: g.validFrom ? new Date(g.validFrom).toISOString() : null,
+              validTo: g.validTo ? new Date(g.validTo).toISOString() : null,
+            }));
+        }
+
         return {
           id: invitation.id,
           employeeName: invitation.employeeName,
@@ -160,6 +227,17 @@ export async function GET(req: NextRequest) {
             otpCode: otp.otpCode,
             expiresAt: toIST(otp.expiresAt),
           } : null,
+          // Additive. Null for an ordinary visitor pass.
+          event: invitation.eventId
+            ? {
+                id: invitation.eventId,
+                name: invitation.eventName,
+                slug: invitation.eventSlug,
+                type: invitation.eventType,
+                location: invitation.eventLocation,
+              }
+            : null,
+          coupons,
         };
       })
     );
