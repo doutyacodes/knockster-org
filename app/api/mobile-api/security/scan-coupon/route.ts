@@ -169,7 +169,13 @@ export async function POST(req: NextRequest) {
         )
       );
 
-    const changed = (result as unknown as { affectedRows?: number })?.affectedRows ?? 0;
+    // drizzle-mysql2 resolves to mysql2's raw [ResultSetHeader, FieldPacket[]],
+    // so affectedRows lives on element 0, NOT on the result itself. Reading it
+    // off the result gives undefined, which made every redemption report
+    // "redeemed by someone else" while still incrementing the count — the
+    // guest is refused food they are entitled to AND loses a use for it.
+    const header = (result as unknown as [{ affectedRows?: number }])[0];
+    const changed = header?.affectedRows ?? 0;
     if (changed === 0) {
       return deny(`${row.couponTitle} was just redeemed by someone else`, 409);
     }

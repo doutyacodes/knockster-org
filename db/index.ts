@@ -26,11 +26,31 @@ const poolConnection = mysql.createPool(process.env.DATABASE_URL);
  * drift, and `invitation_scan_event` history shifts. Nothing errors.
  *
  * lib/timezone.ts already states the contract — "Database stores everything in
- * UTC, display in IST" — and this is what actually enforces the UTC half of it,
- * independent of whatever time zone the host machine happens to be in.
+ * UTC, display in IST" — and this is what enforces the UTC half of it.
  *
- * Done per-connection rather than by changing the server's global `time_zone`
- * so that other databases on a shared local MySQL instance are unaffected.
+ * THE SERVER ITSELF MUST ALSO BE UTC. This pin is necessary but not
+ * sufficient, and it is worth being precise about why, because an earlier
+ * version of this comment claimed otherwise and the claim is false.
+ *
+ * Zuppdate shares these exact tables and writes them through Prisma, which
+ * treats a TIMESTAMP as naive text: it writes the UTC wall clock verbatim and
+ * reads it back verbatim, ignoring the session time zone entirely. MySQL,
+ * however, parses that text AS the session zone. So the two agree only when
+ * the server's zone is UTC:
+ *
+ *   server UTC   — Prisma writes "18:23", stored as 18:23Z, both read 18:23Z. OK
+ *   server IST   — Prisma writes "18:23" (meaning UTC), MySQL stores 12:53Z;
+ *                  an unpinned reader sees 12:53Z (off by 5h30m) and a reader
+ *                  pinned to UTC by this very hook sees 07:23Z (off by 11h).
+ *
+ * Pinning therefore makes a non-UTC server worse, not better. Production runs
+ * UTC (verified), so the pin is a no-op safeguard there and the arrangement is
+ * sound; a dev machine must set the server, not just the session:
+ *
+ *   SET PERSIST time_zone = '+00:00';
+ *
+ * A local MySQL left on SYSTEM/IST does not error. It silently expires every
+ * QR the moment it is minted, which is exactly how this was found.
  */
 poolConnection.on('connection', (conn) => {
   conn.query("SET time_zone = '+00:00'");
