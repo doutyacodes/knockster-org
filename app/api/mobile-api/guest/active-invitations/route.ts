@@ -8,11 +8,13 @@ import {
   organizationNode,
 } from '@/db/schema';
 import { authenticateRequest } from '@/lib/auth';
+import { createdByPayload } from '@/lib/creator-role';
 import { successResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
 import { toIST } from '@/lib/timezone';
 import { whereDerivedStatus } from '@/lib/invitation-status';
 import {
   zuppdateEvents,
+  zuppdateEventCreatorContext,
   zuppdateEventCoupons,
   zuppdateEventCouponGrants,
 } from '@/db/zuppdate-schema';
@@ -57,10 +59,18 @@ export async function GET(req: NextRequest) {
         eventSlug: zuppdateEvents.publicSlug,
         eventType: zuppdateEvents.eventType,
         eventLocation: zuppdateEvents.location,
+        eventCreatorRole: zuppdateEventCreatorContext.role,
+        eventCreatorName: zuppdateEventCreatorContext.displayName,
       })
       .from(guestInvitation)
       .leftJoin(organizationNode, eq(guestInvitation.organizationNodeId, organizationNode.id))
       .leftJoin(zuppdateEvents, eq(guestInvitation.eventId, zuppdateEvents.id))
+      // Left, not inner: a personal event records no context row, and a guest
+      // holding that pass must still get their event back.
+      .leftJoin(
+        zuppdateEventCreatorContext,
+        eq(guestInvitation.eventId, zuppdateEventCreatorContext.eventId)
+      )
       .where(
         and(
           eq(guestInvitation.guestId, guestId!),
@@ -235,6 +245,12 @@ export async function GET(req: NextRequest) {
                 slug: invitation.eventSlug,
                 type: invitation.eventType,
                 location: invitation.eventLocation,
+                // Who put this event on, and under which hat. Null for an
+                // individual's own event, which is what no context row means.
+                createdBy: createdByPayload(
+                  invitation.eventCreatorRole,
+                  invitation.eventCreatorName
+                ),
               }
             : null,
           coupons,

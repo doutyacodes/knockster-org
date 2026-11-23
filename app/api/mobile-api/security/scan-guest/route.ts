@@ -9,7 +9,8 @@ import {
   invitationScanEvent,
   organizationNode,
 } from '@/db/schema';
-import { zuppdateEvents } from '@/db/zuppdate-schema';
+import { zuppdateEvents, zuppdateEventCreatorContext } from '@/db/zuppdate-schema';
+import { createdByPayload } from '@/lib/creator-role';
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, errorResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
 import crypto from 'crypto';
@@ -61,11 +62,19 @@ export async function POST(req: NextRequest) {
         eventId: guestInvitation.eventId,
         eventName: zuppdateEvents.name,
         eventSlug: zuppdateEvents.publicSlug,
+        eventCreatorRole: zuppdateEventCreatorContext.role,
+        eventCreatorName: zuppdateEventCreatorContext.displayName,
       })
       .from(guestInvitation)
       .leftJoin(guest, eq(guestInvitation.guestId, guest.id))
       .leftJoin(organizationNode, eq(guestInvitation.organizationNodeId, organizationNode.id))
       .leftJoin(zuppdateEvents, eq(guestInvitation.eventId, zuppdateEvents.id))
+      // Left, not inner: a personal event records no context row, and the gate
+      // must still name the event when scanning a pass for one.
+      .leftJoin(
+        zuppdateEventCreatorContext,
+        eq(guestInvitation.eventId, zuppdateEventCreatorContext.eventId)
+      )
       .where(eq(guestInvitation.id, invitationId))
       .limit(1);
 
@@ -155,7 +164,15 @@ export async function POST(req: NextRequest) {
           isPreApproved,
           // Additive: null unless this is an event pass.
           event: invitation.eventId
-            ? { id: invitation.eventId, name: invitation.eventName, slug: invitation.eventSlug }
+            ? {
+                id: invitation.eventId,
+                name: invitation.eventName,
+                slug: invitation.eventSlug,
+                createdBy: createdByPayload(
+                  invitation.eventCreatorRole,
+                  invitation.eventCreatorName
+                ),
+              }
             : null,
         },
       });
@@ -182,7 +199,15 @@ export async function POST(req: NextRequest) {
           },
           isPreApproved,
           event: invitation.eventId
-            ? { id: invitation.eventId, name: invitation.eventName, slug: invitation.eventSlug }
+            ? {
+                id: invitation.eventId,
+                name: invitation.eventName,
+                slug: invitation.eventSlug,
+                createdBy: createdByPayload(
+                  invitation.eventCreatorRole,
+                  invitation.eventCreatorName
+                ),
+              }
             : null,
         },
       });

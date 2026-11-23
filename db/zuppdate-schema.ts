@@ -119,3 +119,71 @@ export const zuppdateEventCouponRedemptions = mysqlTable('event_coupon_redemptio
   failureReason: text('failure_reason'),
   at: datetime('at', { fsp: 3 }).notNull(),
 });
+
+/**
+ * Which hat the organiser wore when the event was created.
+ *
+ * `display_name` is a snapshot taken at creation, so read it rather than
+ * joining through to the building or showroom: the FKs are SetNull on the
+ * Zuppdate side, which means the referenced row can be gone while the label
+ * is still correct for that event.
+ */
+export const zuppdateEventCreatorContext = mysqlTable('event_creator_context', {
+  id: varchar('id', { length: 191 }).primaryKey(),
+  eventId: varchar('event_id', { length: 191 }).notNull(),
+  role: mysqlEnum('role', [
+    'PERSONAL',
+    'BUSINESS',
+    'BUSINESS_MANAGER',
+    'PROPERTY_MANAGER',
+    'SOCIETY_ADMIN',
+    'SOCIETY_OWNER',
+    'SOCIETY_TENANT',
+  ]).notNull(),
+  buildingId: varchar('building_id', { length: 191 }),
+  apartmentId: varchar('apartment_id', { length: 191 }),
+  showroomId: varchar('showroom_id', { length: 191 }),
+  displayName: varchar('display_name', { length: 255 }).notNull(),
+  createdAt: datetime('created_at', { fsp: 3 }).notNull(),
+});
+
+/**
+ * The event's own itinerary, so the guest app can show what a pass is for
+ * rather than just naming the event.
+ *
+ * Times here follow Zuppdate's UTC-anchored wall-clock convention (see
+ * zuppdate/app/lib/format.ts): the stored value IS the clock face to show, not
+ * an instant to convert. Do NOT run these through toIST() — that is for
+ * Zuppgate's own real-UTC timestamps, and applying it here shifts every
+ * activity by the offset.
+ */
+export const zuppdateEventDays = mysqlTable('event_days', {
+  id: varchar('id', { length: 191 }).primaryKey(),
+  eventId: varchar('eventId', { length: 191 }).notNull(),
+  date: datetime('date', { fsp: 3 }).notNull(),
+  dayIndex: int('dayIndex').notNull(),
+  label: varchar('label', { length: 191 }).notNull(),
+});
+
+export const zuppdateActivities = mysqlTable('activities', {
+  id: varchar('id', { length: 191 }).primaryKey(),
+  dayId: varchar('dayId', { length: 191 }).notNull(),
+  parentId: varchar('parentId', { length: 191 }),
+  title: varchar('title', { length: 191 }).notNull(),
+  startTime: datetime('startTime', { fsp: 3 }).notNull(),
+  durationMinutes: int('durationMinutes').notNull(),
+  extendMinutes: int('extendMinutes').notNull(),
+  delayMinutes: int('delayMinutes').notNull(),
+  location: varchar('location', { length: 191 }),
+  order: int('order').notNull(),
+  status: mysqlEnum('status', [
+    'UPCOMING',
+    'LIVE',
+    'COMPLETED',
+    'DELAYED',
+    'PAUSED',
+    'SKIPPED',
+    'CANCELLED',
+  ]).notNull(),
+  isTimeBound: boolean('isTimeBound').notNull(),
+});
