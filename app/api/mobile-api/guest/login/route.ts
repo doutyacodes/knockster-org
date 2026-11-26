@@ -1,10 +1,10 @@
 import { NextRequest } from 'next/server';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or, like } from 'drizzle-orm';
 import { db } from '@/db';
 import { guest, guestDevice, notificationTokens } from '@/db/schema';
 import { generateToken } from '@/lib/auth';
 import { successResponse, errorResponse } from '@/lib/api-response';
-import { linkGuestToUser, zuppdateAccountPayload } from '@/lib/account-link';
+import { linkGuestToUser, zuppdateAccountPayload, normalizePhone } from '@/lib/account-link';
 import crypto from 'crypto';
 
 // POST /api/mobile-api/guest/login - Guest login with phone number (OTP-less for now)
@@ -17,12 +17,29 @@ export async function POST(req: NextRequest) {
       return errorResponse('Phone number is required', 400);
     }
 
-    // Find or create guest by phone
+    const rawPhone = String(phone).trim();
+    const normalized = normalizePhone(rawPhone);
+
+    // Find or create guest by phone (checking exact match first, then normalized phone)
     let guestData = await db
       .select()
       .from(guest)
-      .where(eq(guest.phone, phone))
+      .where(eq(guest.phone, rawPhone))
       .limit(1);
+
+    if (guestData.length === 0 && normalized.length >= 10) {
+      guestData = await db
+        .select()
+        .from(guest)
+        .where(
+          or(
+            eq(guest.phone, normalized),
+            eq(guest.phone, `+91${normalized}`),
+            like(guest.phone, `%${normalized}`)
+          )
+        )
+        .limit(1);
+    }
 
     let guestUser;
 

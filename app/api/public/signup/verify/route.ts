@@ -50,49 +50,14 @@ export async function POST(req: NextRequest) {
     const [plan] = await db.select().from(subscriptionPlan).where(eq(subscriptionPlan.id, planId)).limit(1);
     if (!plan) return errorResponse('Plan not found', 404);
 
-    // Create Organization Node
-    const [newOrg] = await db.insert(organizationNode).values({
-      name: orgName,
-      type: orgType,
-      imageUrl: imageUrl,
-      status: 'active'
-    }).$returningId();
-
-    const orgId = newOrg.id;
-
-    // Create Org Admin
+    const orgId = crypto.randomUUID();
+    const adminId = crypto.randomUUID();
     const hashedPassword = await hashPassword(adminPassword);
-    const [newAdmin] = await db.insert(orgAdmin).values({
-      organizationNodeId: orgId,
-      email: adminEmail,
-      passwordHash: hashedPassword,
-      status: 'active',
-      canManageHierarchy: true
-    }).$returningId();
 
-    // Assign Plan
     const startDate = new Date();
     const endDate = new Date();
     endDate.setFullYear(endDate.getFullYear() + 1); // 1 year plan
 
-    await db.insert(organizationPlan).values({
-      organizationNodeId: orgId,
-      subscriptionPlanId: planId,
-      startDate: startDate,
-      endDate: endDate,
-      status: 'active'
-    });
-
-    // Create Billing Record
-    await db.insert(billingRecord).values({
-      organizationNodeId: orgId,
-      subscriptionPlanId: planId,
-      paymentReference: razorpayPaymentId,
-      amount: plan.price,
-      status: 'paid'
-    });
-
-    // Seed Visitor Types
     const defaultVisitorTypes = [
       { name: 'Guest', defaultSecurityLevel: 1 },
       { name: 'Interview', defaultSecurityLevel: 2 },
@@ -101,18 +66,61 @@ export async function POST(req: NextRequest) {
       { name: 'VIP', defaultSecurityLevel: 4 },
     ];
 
-    for (const vt of defaultVisitorTypes) {
-      await db.insert(visitorType).values({
-        organizationNodeId: orgId,
-        name: vt.name,
-        defaultSecurityLevel: vt.defaultSecurityLevel
+    await db.transaction(async (tx) => {
+      // Create Organization Node
+      await tx.insert(organizationNode).values({
+        id: orgId,
+        name: orgName,
+        type: orgType,
+        imageUrl: imageUrl,
+        status: 'active',
       });
-    }
+
+      // Create Org Admin
+      await tx.insert(orgAdmin).values({
+        id: adminId,
+        organizationNodeId: orgId,
+        email: adminEmail,
+        passwordHash: hashedPassword,
+        status: 'active',
+        canManageHierarchy: true,
+      });
+
+      // Assign Plan
+      await tx.insert(organizationPlan).values({
+        id: crypto.randomUUID(),
+        organizationNodeId: orgId,
+        subscriptionPlanId: planId,
+        startDate: startDate,
+        endDate: endDate,
+        status: 'active',
+      });
+
+      // Create Billing Record
+      await tx.insert(billingRecord).values({
+        id: crypto.randomUUID(),
+        organizationNodeId: orgId,
+        subscriptionPlanId: planId,
+        paymentReference: razorpayPaymentId,
+        amount: plan.price,
+        status: 'paid',
+      });
+
+      // Seed Visitor Types
+      for (const vt of defaultVisitorTypes) {
+        await tx.insert(visitorType).values({
+          id: crypto.randomUUID(),
+          organizationNodeId: orgId,
+          name: vt.name,
+          defaultSecurityLevel: vt.defaultSecurityLevel,
+        });
+      }
+    });
 
     return successResponse({
       message: 'Signup successful',
       organizationId: orgId,
-      adminId: newAdmin.id
+      adminId,
     }, 201);
 
   } catch (error) {

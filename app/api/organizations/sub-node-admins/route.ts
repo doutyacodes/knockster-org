@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { eq, and } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { orgAdmin, organizationNode, auditLog } from "@/db/schema";
 import { authenticateRequest, hashPassword } from "@/lib/auth";
@@ -9,6 +9,18 @@ import {
   errorResponse,
 } from "@/lib/api-response";
 import { z } from "zod";
+
+async function getAllDescendantIds(parentIds: string[]): Promise<string[]> {
+  if (parentIds.length === 0) return [];
+  const children = await db
+    .select({ id: organizationNode.id })
+    .from(organizationNode)
+    .where(inArray(organizationNode.parentId, parentIds));
+  if (children.length === 0) return [];
+  const childIds = children.map((c) => c.id);
+  const grandchildIds = await getAllDescendantIds(childIds);
+  return [...childIds, ...grandchildIds];
+}
 
 const createAdminSchema = z.object({
   organizationNodeId: z.string().uuid("Invalid organization node ID"),
@@ -42,18 +54,10 @@ export async function GET(req: NextRequest) {
     if (!currentAdmin) return unauthorizedResponse("Admin not found");
 
     // Verify sub-node belongs to current admin's hierarchy
-    const [node] = await db
-      .select()
-      .from(organizationNode)
-      .where(
-        and(
-          eq(organizationNode.id, nodeId),
-          eq(organizationNode.parentId, currentAdmin.organizationNodeId)
-        )
-      )
-      .limit(1);
-
-    if (!node) return unauthorizedResponse("Node not found or access denied");
+    const descendantIds = await getAllDescendantIds([currentAdmin.organizationNodeId]);
+    if (!descendantIds.includes(nodeId) && nodeId !== currentAdmin.organizationNodeId) {
+      return unauthorizedResponse("Node not found or access denied");
+    }
 
     const admins = await db
       .select({
@@ -107,18 +111,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify sub-node belongs to current admin's hierarchy
-    const [node] = await db
-      .select()
-      .from(organizationNode)
-      .where(
-        and(
-          eq(organizationNode.id, organizationNodeId),
-          eq(organizationNode.parentId, currentAdmin.organizationNodeId)
-        )
-      )
-      .limit(1);
-
-    if (!node) return errorResponse("Target node not found or access denied", 403);
+    const descendantIds = await getAllDescendantIds([currentAdmin.organizationNodeId]);
+    if (!descendantIds.includes(organizationNodeId) && organizationNodeId !== currentAdmin.organizationNodeId) {
+      return errorResponse("Target node not found or access denied", 403);
+    }
 
     // Check if email already exists
     const [existing] = await db

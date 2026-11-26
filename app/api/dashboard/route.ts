@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { eq, and, gte, lte, sql, desc } from 'drizzle-orm';
+import { eq, and, gte, sql, desc } from 'drizzle-orm';
 import { db } from '@/db';
 import {
   guestInvitation,
@@ -10,7 +10,6 @@ import {
 } from '@/db/schema';
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, unauthorizedResponse, serverErrorResponse } from '@/lib/api-response';
-import { toIST } from '@/lib/timezone';
 import { whereDerivedStatus } from '@/lib/invitation-status';
 
 // GET /api/dashboard - Get dashboard statistics and data
@@ -36,7 +35,7 @@ export async function GET(req: NextRequest) {
 
     // Calculate date range for scan frequency chart
     const now = new Date();
-    let startDate = new Date();
+    const startDate = new Date();
 
     if (timeRange === 'today') {
       startDate.setHours(0, 0, 0, 0);
@@ -46,73 +45,144 @@ export async function GET(req: NextRequest) {
       startDate.setMonth(now.getMonth() - 1);
     }
 
-    // 1. Get Stats - Active Invitations Count
-    const activeInvitationsResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(guestInvitation)
-      .where(
-        and(
-          eq(guestInvitation.organizationNodeId, organizationNodeId!),
-          // Derived, not the stored column -- see lib/invitation-status.ts.
-          whereDerivedStatus('active')
-        )
-      );
-    const activeInvitations = Number(activeInvitationsResult[0]?.count || 0);
+    // Execute dashboard queries concurrently to avoid sequential database round-trips
+    const [
+      activeInvitationsResult,
+      upcomingVisitsResult,
+      securityGuardsResult,
+      recentFailedScansResult,
+      frequencyScans,
+      tierDistribution,
+      criticalAlerts,
+      orgNode,
+    ] = await Promise.all([
+      // 1. Get Stats - Active Invitations Count
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(guestInvitation)
+        .where(
+          and(
+            eq(guestInvitation.organizationNodeId, organizationNodeId!),
+            whereDerivedStatus('active')
+          )
+        ),
 
-    // 2. Get Stats - Upcoming Visits Count (pending invitations)
-    const upcomingVisitsResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(guestInvitation)
-      .where(
-        and(
-          eq(guestInvitation.organizationNodeId, organizationNodeId!),
-          whereDerivedStatus('pending')
-        )
-      );
-    const upcomingVisits = Number(upcomingVisitsResult[0]?.count || 0);
+      // 2. Get Stats - Upcoming Visits Count (pending invitations)
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(guestInvitation)
+        .where(
+          and(
+            eq(guestInvitation.organizationNodeId, organizationNodeId!),
+            whereDerivedStatus('pending')
+          )
+        ),
 
-    // 3. Get Stats - Security Guards Count
-    const securityGuardsResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(securityPersonnel)
-      .where(eq(securityPersonnel.organizationNodeId, organizationNodeId!));
-    const securityGuards = Number(securityGuardsResult[0]?.count || 0);
+      // 3. Get Stats - Security Guards Count
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(securityPersonnel)
+        .where(eq(securityPersonnel.organizationNodeId, organizationNodeId!)),
 
-    // 4. Get Stats - Recent Failed Scans (Alerts)
-    const recentFailedScansResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(invitationScanEvent)
-      .innerJoin(guestInvitation, eq(invitationScanEvent.invitationId, guestInvitation.id))
-      .where(
-        and(
-          eq(guestInvitation.organizationNodeId, organizationNodeId!),
-          eq(invitationScanEvent.success, false),
-          gte(invitationScanEvent.timestamp, sql`DATE_SUB(NOW(), INTERVAL 24 HOUR)`)
-        )
-      );
-    const alertsPending = Number(recentFailedScansResult[0]?.count || 0);
-
-    // 5. Scan Frequency Data (hourly for today, daily for week/month)
-    let scanFrequencyData;
-
-    if (timeRange === 'today') {
-      // Group by hour for today
-      const hourlyScans = await db
-        .select({
-          hour: sql<number>`HOUR(${invitationScanEvent.timestamp})`,
-          count: sql<number>`count(*)`
-        })
+      // 4. Get Stats - Recent Failed Scans (Alerts)
+      db
+        .select({ count: sql<number>`count(*)` })
         .from(invitationScanEvent)
         .innerJoin(guestInvitation, eq(invitationScanEvent.invitationId, guestInvitation.id))
         .where(
           and(
             eq(guestInvitation.organizationNodeId, organizationNodeId!),
-            gte(invitationScanEvent.timestamp, startDate)
+            eq(invitationScanEvent.success, false),
+            gte(invitationScanEvent.timestamp, sql`DATE_SUB(NOW(), INTERVAL 24 HOUR)`)
+          )
+        ),
+
+      // 5. Scan Frequency Data
+      timeRange === 'today'
+        ? db
+            .select({
+              hour: sql<number>`HOUR(${invitationScanEvent.timestamp})`,
+              count: sql<number>`count(*)`
+            })
+            .from(invitationScanEvent)
+            .innerJoin(guestInvitation, eq(invitationScanEvent.invitationId, guestInvitation.id))
+            .where(
+              and(
+                eq(guestInvitation.organizationNodeId, organizationNodeId!),
+                gte(invitationScanEvent.timestamp, startDate)
+              )
+            )
+            .groupBy(sql`HOUR(${invitationScanEvent.timestamp})`)
+        : db
+            .select({
+              date: sql<string>`DATE(${invitationScanEvent.timestamp})`,
+              count: sql<number>`count(*)`
+            })
+            .from(invitationScanEvent)
+            .innerJoin(guestInvitation, eq(invitationScanEvent.invitationId, guestInvitation.id))
+            .where(
+              and(
+                eq(guestInvitation.organizationNodeId, organizationNodeId!),
+                gte(invitationScanEvent.timestamp, startDate)
+              )
+            )
+            .groupBy(sql`DATE(${invitationScanEvent.timestamp})`),
+
+      // 6. Security Tier Distribution
+      db
+        .select({
+          level: guestInvitation.requestedSecurityLevel,
+          count: sql<number>`count(*)`
+        })
+        .from(guestInvitation)
+        .where(eq(guestInvitation.organizationNodeId, organizationNodeId!))
+        .groupBy(guestInvitation.requestedSecurityLevel),
+
+      // 7. Critical Security Alerts (Recent Failed Scans)
+      db
+        .select({
+          id: invitationScanEvent.id,
+          scannedAt: invitationScanEvent.timestamp,
+          success: invitationScanEvent.success,
+          failureReason: invitationScanEvent.failureReason,
+          guardUsername: securityPersonnel.username,
+          guestName: guest.name,
+          guestPhone: guest.phone,
+          securityLevel: guestInvitation.requestedSecurityLevel
+        })
+        .from(invitationScanEvent)
+        .innerJoin(guestInvitation, eq(invitationScanEvent.invitationId, guestInvitation.id))
+        .leftJoin(securityPersonnel, eq(invitationScanEvent.scannedBySecurityPersonnelId, securityPersonnel.id))
+        .leftJoin(guest, eq(guestInvitation.guestId, guest.id))
+        .where(
+          and(
+            eq(guestInvitation.organizationNodeId, organizationNodeId!),
+            eq(invitationScanEvent.success, false),
+            gte(invitationScanEvent.timestamp, sql`DATE_SUB(NOW(), INTERVAL 24 HOUR)`)
           )
         )
-        .groupBy(sql`HOUR(${invitationScanEvent.timestamp})`);
+        .orderBy(desc(invitationScanEvent.timestamp))
+        .limit(10),
 
-      // Create array for all 24 hours
+      // 8. Organization node info
+      db
+        .select({
+          name: organizationNode.name,
+          type: organizationNode.type
+        })
+        .from(organizationNode)
+        .where(eq(organizationNode.id, organizationNodeId!))
+        .limit(1),
+    ]);
+
+    const activeInvitations = Number(activeInvitationsResult[0]?.count || 0);
+    const upcomingVisits = Number(upcomingVisitsResult[0]?.count || 0);
+    const securityGuards = Number(securityGuardsResult[0]?.count || 0);
+    const alertsPending = Number(recentFailedScansResult[0]?.count || 0);
+
+    let scanFrequencyData;
+    if (timeRange === 'today') {
+      const hourlyScans = frequencyScans as { hour: number; count: number }[];
       scanFrequencyData = Array.from({ length: 24 }, (_, i) => {
         const hourData = hourlyScans.find(h => h.hour === i);
         const hour = i === 0 ? 12 : i > 12 ? i - 12 : i;
@@ -121,40 +191,14 @@ export async function GET(req: NextRequest) {
           name: `${hour.toString().padStart(2, '0')} ${ampm}`,
           scans: Number(hourData?.count || 0)
         };
-      }).filter((_, i) => i % 2 === 0); // Show every 2 hours to avoid clutter
-
+      }).filter((_, i) => i % 2 === 0);
     } else {
-      // Group by day for week/month
-      const dailyScans = await db
-        .select({
-          date: sql<string>`DATE(${invitationScanEvent.timestamp})`,
-          count: sql<number>`count(*)`
-        })
-        .from(invitationScanEvent)
-        .innerJoin(guestInvitation, eq(invitationScanEvent.invitationId, guestInvitation.id))
-        .where(
-          and(
-            eq(guestInvitation.organizationNodeId, organizationNodeId!),
-            gte(invitationScanEvent.timestamp, startDate)
-          )
-        )
-        .groupBy(sql`DATE(${invitationScanEvent.timestamp})`);
-
+      const dailyScans = frequencyScans as { date: string; count: number }[];
       scanFrequencyData = dailyScans.map(day => ({
         name: new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         scans: Number(day.count || 0)
       }));
     }
-
-    // 6. Security Tier Distribution
-    const tierDistribution = await db
-      .select({
-        level: guestInvitation.requestedSecurityLevel,
-        count: sql<number>`count(*)`
-      })
-      .from(guestInvitation)
-      .where(eq(guestInvitation.organizationNodeId, organizationNodeId!))
-      .groupBy(guestInvitation.requestedSecurityLevel);
 
     const totalInvitations = tierDistribution.reduce((sum, tier) => sum + Number(tier.count), 0);
 
@@ -178,38 +222,11 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // 7. Critical Security Alerts (Recent Failed Scans)
-    const criticalAlerts = await db
-      .select({
-        id: invitationScanEvent.id,
-        scannedAt: invitationScanEvent.timestamp,
-        success: invitationScanEvent.success,
-        failureReason: invitationScanEvent.failureReason,
-        guardUsername: securityPersonnel.username,
-        guestName: guest.name,
-        guestPhone: guest.phone,
-        securityLevel: guestInvitation.requestedSecurityLevel
-      })
-      .from(invitationScanEvent)
-      .innerJoin(guestInvitation, eq(invitationScanEvent.invitationId, guestInvitation.id))
-      .leftJoin(securityPersonnel, eq(invitationScanEvent.scannedBySecurityPersonnelId, securityPersonnel.id))
-      .leftJoin(guest, eq(guestInvitation.guestId, guest.id))
-      .where(
-        and(
-          eq(guestInvitation.organizationNodeId, organizationNodeId!),
-          eq(invitationScanEvent.success, false),
-          gte(invitationScanEvent.timestamp, sql`DATE_SUB(NOW(), INTERVAL 24 HOUR)`)
-        )
-      )
-      .orderBy(desc(invitationScanEvent.timestamp))
-      .limit(10);
-
     const alerts = criticalAlerts.map(alert => {
       const timeAgo = getTimeAgo(new Date(alert.scannedAt));
 
-      // Determine alert type based on failure reason
       let type = 'UNAUTHORIZED';
-      let message = alert.failureReason || 'Scan verification failed';
+      const message = alert.failureReason || 'Scan verification failed';
 
       if (alert.failureReason?.toLowerCase().includes('otp')) {
         type = 'OTP_FAILURE';
@@ -226,16 +243,6 @@ export async function GET(req: NextRequest) {
         severity: type === 'OTP_FAILURE' ? 'high' : type === 'EXPIRATION' ? 'medium' : 'low'
       };
     });
-
-    // 8. Get organization node info
-    const orgNode = await db
-      .select({
-        name: organizationNode.name,
-        type: organizationNode.type
-      })
-      .from(organizationNode)
-      .where(eq(organizationNode.id, organizationNodeId!))
-      .limit(1);
 
     const dashboardData = {
       stats: {

@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Parse security QR code
-    let qrData: any;
+    let qrData: { guardId?: string; organizationNodeId?: string; signature?: string; type?: string };
     try {
       qrData = JSON.parse(securityQrCode);
     } catch {
@@ -116,8 +116,21 @@ export async function POST(req: NextRequest) {
       return errorResponse('No active invitations found', 404);
     }
 
-    // Find the highest security level invitation
-    const invitation = activeInvitations[activeInvitations.length - 1];
+    // Filter to invitations valid for this guard's organization / venue hierarchy
+    const matchingInvitations: typeof activeInvitations = [];
+    for (const inv of activeInvitations) {
+      const allowed = await checkOrganizationHierarchy(guardOrgId, inv.organizationNodeId);
+      if (allowed) {
+        matchingInvitations.push(inv);
+      }
+    }
+
+    if (matchingInvitations.length === 0) {
+      return errorResponse('No active invitation found for this venue or gate', 403);
+    }
+
+    // Find the highest security level invitation valid for this venue
+    const invitation = matchingInvitations[matchingInvitations.length - 1];
 
     // Check if invitation requires L3 or L4
     if (invitation.securityLevel !== 3 && invitation.securityLevel !== 4) {
@@ -144,8 +157,7 @@ export async function POST(req: NextRequest) {
       return errorResponse('This invitation has been revoked', 403);
     }
 
-    // Check organization hierarchy
-    const isPreApproved = await checkOrganizationHierarchy(guardOrgId, invitation.organizationNodeId);
+    const isPreApproved = true;
 
     // For L3: Direct approval (guest app authenticated + security scan)
     if (invitation.securityLevel === 3) {

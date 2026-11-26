@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
+import crypto from 'crypto';
 import { db } from '@/db';
-import { guestInvitation, guest, orgAdmin } from '@/db/schema';
+import { guestInvitation, guest } from '@/db/schema';
 import { authenticateRequest } from '@/lib/auth';
 import { successResponse, errorResponse, unauthorizedResponse } from '@/lib/api-response';
 import { toIST, fromIST } from '@/lib/timezone';
@@ -167,7 +168,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Find or create guest
-    let [existingGuest] = await db
+    const [existingGuest] = await db
       .select()
       .from(guest)
       .where(eq(guest.phone, guestPhone))
@@ -186,15 +187,16 @@ export async function POST(req: NextRequest) {
       }
     } else {
       // Create new guest
-      const [newGuest] = await db
+      const newGuestId = crypto.randomUUID();
+      await db
         .insert(guest)
         .values({
+          id: newGuestId,
           name: guestName,
           phone: guestPhone,
-        })
-        .$returningId();
+        });
 
-      guestId = newGuest.id;
+      guestId = newGuestId;
     }
 
     // The person being invited may already be a Zuppdate customer — link the
@@ -216,9 +218,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Create invitation
-    const [newInvitation] = await db
+    const newInvitationId = crypto.randomUUID();
+    await db
       .insert(guestInvitation)
       .values({
+        id: newInvitationId,
         guestId,
         organizationNodeId: organizationNodeId!,
         createdByOrgAdminId: adminId!,
@@ -229,8 +233,7 @@ export async function POST(req: NextRequest) {
         validTo: validToDate,
         requestedSecurityLevel: securityLevelNum,
         status,
-      })
-      .$returningId();
+      });
 
     // Fetch the created invitation with guest details
     const [invitation] = await db
@@ -249,7 +252,7 @@ export async function POST(req: NextRequest) {
       })
       .from(guestInvitation)
       .leftJoin(guest, eq(guestInvitation.guestId, guest.id))
-      .where(eq(guestInvitation.id, newInvitation.id))
+      .where(eq(guestInvitation.id, newInvitationId))
       .limit(1);
 
     // Transform to frontend format with IST timezone

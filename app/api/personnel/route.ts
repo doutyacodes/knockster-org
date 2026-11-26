@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { eq, desc } from 'drizzle-orm';
+import crypto from 'crypto';
 import { db } from '@/db';
 import { securityPersonnel, guardDevice } from '@/db/schema';
 import { authenticateRequest, hashPassword } from '@/lib/auth';
@@ -111,17 +112,18 @@ export async function POST(req: NextRequest) {
     const shiftEndFormatted = shiftEnd || null;
 
     // Create personnel
-    const [newPersonnel] = await db
+    const newPersonnelId = crypto.randomUUID();
+    await db
       .insert(securityPersonnel)
       .values({
+        id: newPersonnelId,
         organizationNodeId: organizationNodeId!,
         username,
         passwordHash,
         shiftStartTime: shiftStartFormatted,
         shiftEndTime: shiftEndFormatted,
         status: 'active',
-      })
-      .$returningId();
+      });
 
     // Fetch the created personnel
     const [personnel] = await db
@@ -134,7 +136,7 @@ export async function POST(req: NextRequest) {
         createdAt: securityPersonnel.createdAt,
       })
       .from(securityPersonnel)
-      .where(eq(securityPersonnel.id, newPersonnel.id))
+      .where(eq(securityPersonnel.id, newPersonnelId))
       .limit(1);
 
     // Transform status to boolean and convert dates to IST

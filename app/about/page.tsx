@@ -48,9 +48,14 @@ export default function AboutPage() {
 
   // Show the full dashboard nav when signed in, the public nav otherwise
   useEffect(() => {
-    if (localStorage.getItem("zuppgate_auth") !== "true") return;
-    setLoggedIn(true);
-    api.get<User>("/api/auth/me").then(setUser).catch(() => {});
+    if (localStorage.getItem("zuppgate_auth") === "true") {
+      api.get<User>("/api/auth/me")
+        .then((u) => {
+          setUser(u);
+          setLoggedIn(true);
+        })
+        .catch(() => {});
+    }
   }, []);
 
   const handleLogout = () => {

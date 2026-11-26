@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { eq, and } from 'drizzle-orm';
+import crypto from 'crypto';
 import { db } from '@/db';
 import { visitorType } from '@/db/schema';
 import { authenticateRequest } from '@/lib/auth';
@@ -51,19 +52,20 @@ export async function POST(req: NextRequest) {
       return errorResponse('Name and defaultSecurityLevel are required', 400);
     }
 
-    const [newType] = await db
+    const newTypeId = crypto.randomUUID();
+    await db
       .insert(visitorType)
       .values({
+        id: newTypeId,
         organizationNodeId: organizationNodeId!,
         name,
         defaultSecurityLevel,
-      })
-      .$returningId();
+      });
 
     const [created] = await db
       .select()
       .from(visitorType)
-      .where(eq(visitorType.id, newType.id))
+      .where(eq(visitorType.id, newTypeId))
       .limit(1);
 
     return successResponse(created, 201);
