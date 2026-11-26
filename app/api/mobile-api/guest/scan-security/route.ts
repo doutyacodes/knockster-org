@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 
     const { guardId, organizationNodeId: guardOrgId, signature, type } = qrData;
 
-    if (type !== 'security_qr') {
+    if (type !== 'security_qr' || !guardId || !guardOrgId || !signature) {
       return errorResponse('Invalid security QR code', 400);
     }
 
